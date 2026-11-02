@@ -7,6 +7,10 @@ has been published, and this project has not been uploaded to PyPI.
 
 ### Added
 
+- `pyforge.testing` with `FakeClock`, `RecordingSleeper`,
+  `AsyncRecordingSleeper`, `CallCount`, `FailThenReturn`, `ClockedCache`, and
+  `temporary_env`. Importing `pyforge` does not load these helpers. They do
+  not sleep, patch the standard library, or add a runtime dependency.
 - `MemoryCache` and `CacheStats` for a process-local LRU cache. Entries may
   expire after a monotonic TTL. `max_entries` bounds the count. There is no
   background thread, persistence, or shared cache. A stored `None` is present.

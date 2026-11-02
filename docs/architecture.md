@@ -4,8 +4,8 @@
 
 PyForge is a dependency-free Python 3.11+ library. The implemented modules are
 bounded retry, JSON logging, environment-backed configuration, HTTP retry
-decisions, retry events, and a process-local memory cache. There is no HTTP
-client in the package.
+decisions, retry events, a process-local memory cache, and deterministic
+test helpers. There is no HTTP client in the package.
 
 The public API is:
 
@@ -47,9 +47,11 @@ from pyforge import (
   success, and exhausted attempts. There is no global observer.
 - `MemoryCache`: one instance owns an ordered mapping, a lock, and counters.
   There is no process-wide cache.
+- `pyforge.testing`: fake clock, recorded sleep, scripted calls, and a
+  temporary environment block. The package root does not import it.
 - `tests/test_retry.py`, `tests/test_logging.py`, `tests/test_config.py`,
-  `tests/test_http.py`, `tests/test_observe.py`, and `tests/test_cache.py`:
-  deterministic unit tests.
+  `tests/test_http.py`, `tests/test_observe.py`, `tests/test_cache.py`, and
+  `tests/test_testing.py`: deterministic unit tests.
   Retry and HTTP tests inject sleep and randomness. Logging tests inject
   records and handlers. Configuration tests use `monkeypatch`. HTTP tests use
   fakes and do not open sockets. Cache tests inject a monotonic clock and do
@@ -246,12 +248,30 @@ That error text does not include the key.
 counters unchanged. `reset_stats` zeros the counters and leaves the entries
 unchanged.
 
+## Test helpers
+
+`pyforge.testing` is imported by tests. Production code can keep importing
+`pyforge` without loading it.
+
+`FakeClock` starts at a finite number and moves only when `advance` is called.
+`ClockedCache` passes that clock to `MemoryCache`. `RecordingSleeper` is the
+synchronous `retry` sleep callable. `AsyncRecordingSleeper` is the separate
+awaitable form. Neither waits. `CallCount` and `FailThenReturn` keep their
+counts on the instance. `FailThenReturn` constructs its exception type with
+no arguments, so the exception has no message.
+
+`temporary_env` writes only the names in its mapping. On exit it restores
+each of those names to its previous value, or removes it if it was absent.
+An empty string is restored as an empty string. A name created inside the
+block and omitted from the mapping stays set. The helper validates the
+mapping before it changes `os.environ`.
+
 ## Import side effects
 
 Importing `pyforge` imports the retry, logging, configuration, HTTP decision,
-observability, and cache modules. It does not configure the root logger, read
-environment variables, read `.env` files, register an observer, start a
-thread, or open a network connection.
+observability, and cache modules. It does not import `pyforge.testing`,
+configure the root logger, read environment variables, read `.env` files,
+register an observer, start a thread, or open a network connection.
 
 ## Known limitations
 
@@ -275,6 +295,9 @@ thread, or open a network connection.
   `max_entries` does not limit bytes. A backwards clock jump keeps entries
   alive until a later reading reaches their expiration time. Check-then-set
   across two calls is not one atomic operation.
+- `temporary_env` is process-global for the names it changes. It does not
+  isolate those names from other threads. `FakeClock` does not track the
+  system monotonic clock.
 
 ## Further documentation
 
@@ -286,3 +309,4 @@ thread, or open a network connection.
 - [ADR 0004](decisions/0004-http-resilience.md) for the HTTP retry decision.
 - [ADR 0005](decisions/0005-retry-observability.md) for the observer decision.
 - [ADR 0006](decisions/0006-in-memory-cache.md) for the cache decision.
+- [ADR 0007](decisions/0007-testing-utilities.md) for the testing-helper decision.

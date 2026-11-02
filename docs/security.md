@@ -141,6 +141,24 @@ The cache does not start a thread and does not read the environment. A clock
 callback runs without the cache lock. Key hashing and equality run with the
 lock held, so a key that calls back into the same cache can deadlock.
 
+## Test helpers
+
+`pyforge.testing` is part of the installable package so application tests can
+import it. Importing `pyforge` does not import it, and the helpers do not
+patch `time.sleep`, `asyncio.sleep`, or the environment on import.
+
+`temporary_env` writes the process environment. A value placed there is
+readable by every thread until the block exits. The helper restores the
+previous value, including absence, when the block returns or raises. It does
+not log the value, and its errors do not include the name or the value. A
+name that the block sets, and that was not listed in the mapping, is left
+behind. Do not use the helper as a secret store, and do not run two
+environment blocks on the same names at the same time.
+
+`FakeClock`, the recording sleepers, `CallCount`, and `FailThenReturn` keep
+state on the instance. `FailThenReturn` raises an exception constructed with
+no arguments, so the helper does not store an exception message.
+
 ## Dependencies
 
 The installed library has no runtime dependencies. Development tools are

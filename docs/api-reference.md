@@ -587,3 +587,81 @@ profile = cache.get("profile:42", None)
 The default clock is `time.monotonic`. Tests can pass a callable that returns
 a controlled number. The cache reads that callable before it takes its lock.
 There is no background cleanup, no persistence, and no shared cache.
+
+## pyforge.testing
+
+These objects are not exported from the package root. Import them explicitly:
+
+```python
+from pyforge.testing import FakeClock, RecordingSleeper, temporary_env
+```
+
+Importing `pyforge` does not load this module. None of these helpers patches
+a standard-library function.
+
+### FakeClock
+
+```python
+FakeClock(start: float = 0.0)
+clock() -> float
+clock.now -> float
+clock.advance(seconds: float) -> float
+```
+
+`start` is a finite real number. Negative starts are allowed. The reading
+stays at `start` until `advance`. `seconds` is a finite real number of at
+least `0`. `advance` returns the new reading. `True`, `False`, non-numeric
+values, non-finite values, and integers that cannot be represented as finite
+floats raise `TypeError` or `ValueError`.
+
+`ClockedCache.create(max_entries, *, start=0.0)` returns a frozen pair of a
+`MemoryCache` and the `FakeClock` that cache reads. Expire entries by
+advancing `clock`.
+
+### Recording sleepers
+
+```python
+RecordingSleeper()(delay: float) -> None
+AsyncRecordingSleeper()(delay: float) -> Coroutine
+sleeper.delays -> tuple[float, ...]
+```
+
+`RecordingSleeper` is the synchronous `sleep` argument for `retry`.
+`AsyncRecordingSleeper` is the awaitable form. The delay is recorded when the
+instance is called. Zero and positive delays are kept. Invalid delays raise
+and are not appended. `delays` returns a snapshot.
+
+### Call count and scripted failures
+
+```python
+CallCount()
+counter.increment() -> int
+counter.count -> int
+
+FailThenReturn(failures: int, result: T, exc_type: type[Exception] = TimeoutError)
+calls() -> T
+calls.count -> int
+```
+
+`increment` returns the new count, starting at 1. `FailThenReturn` raises
+`exc_type()` for the first `failures` calls, then returns `result`.
+`failures` may be `0`. `exc_type` must be an `Exception` subclass that can be
+constructed with no arguments. `count` includes every call.
+
+### temporary_env
+
+```python
+with temporary_env(values: Mapping[str, str | None]):
+    ...
+```
+
+A string value is assigned. `None` removes that name. On exit, each listed
+name is restored to its previous value, or removed if it was absent. An empty
+string is restored as an empty string. Names created inside the block and
+omitted from `values` are left set. The mapping is validated before the first
+change. Exit restores the listed names when the block raises.
+
+The process environment is shared by every thread. Two blocks that name the
+same variable can overwrite each other. Error text does not include the name
+or the value. A name must be a non-empty string without `=` or a null
+character. A value must be a string or `None`.

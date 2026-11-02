@@ -23,6 +23,7 @@ WHEEL_FILES = (
     "pyforge/logging.py",
     "pyforge/observe.py",
     "pyforge/retry.py",
+    "pyforge/testing.py",
     "pyforge/py.typed",
 )
 SDIST_SUFFIXES = (
@@ -36,6 +37,7 @@ SDIST_SUFFIXES = (
     "src/pyforge/logging.py",
     "src/pyforge/observe.py",
     "src/pyforge/retry.py",
+    "src/pyforge/testing.py",
     "src/pyforge/py.typed",
 )
 
