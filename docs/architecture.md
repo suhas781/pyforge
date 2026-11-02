@@ -2,15 +2,14 @@
 
 ## Scope
 
-PyForge is a dependency-free Python 3.11+ library. The implemented module is
-bounded retry for synchronous and asynchronous callables. Structured logging,
-configuration helpers, and HTTP resilience are specified for later milestones
-and have no code yet.
+PyForge is a dependency-free Python 3.11+ library. The implemented modules are
+bounded retry and JSON logging. Configuration helpers and HTTP resilience are
+later milestones and have no code yet.
 
 The public API is:
 
 ```python
-from pyforge import RetryPolicy, retry
+from pyforge import JsonFormatter, LogContext, RetryPolicy, get_logger, retry
 ```
 
 `pyforge.__version__` is `0.1.0`.
@@ -20,8 +19,14 @@ from pyforge import RetryPolicy, retry
 - `RetryPolicy`: frozen, slotted configuration and `delay_for`.
 - `retry`: decorator factory. It selects a sync or async wrapper with
   `asyncio.iscoroutinefunction`.
-- `tests/test_retry.py`: deterministic unit tests. Sleep and randomness are
-  injected, so the suite does not wait on real timers.
+- `JsonFormatter`: one JSON object per record, using the standard `logging`
+  types. It does not attach handlers.
+- `LogContext` and `get_logger`: optional `request_id`, `operation`,
+  `attempt`, and `component` values. Unknown context keywords are rejected.
+  Unknown `extra` keys stay off the JSON object.
+- `tests/test_retry.py` and `tests/test_logging.py`: deterministic unit tests.
+  Retry tests inject sleep and randomness. Logging tests inject records and
+  handlers.
 
 Tests stay in `tests/` until more than one module needs a split layout. There
 is no integration suite yet.
@@ -100,10 +105,26 @@ non-real, non-finite, or out-of-range values for the numeric fields:
 | `multiplier` | finite number, minimum 1, default 2 |
 | `jitter` | finite fraction in `[0, 1]`, default 0 |
 
+## Structured logging
+
+`JsonFormatter.format` builds a dictionary with `timestamp`, `level`,
+`logger`, and `message`, then adds context and exception fields when they are
+usable. Timestamps come from `LogRecord.created` and are formatted in UTC.
+The formatter has no mutable buffers. `get_logger` returns a
+`logging.LoggerAdapter` and leaves handler configuration to the caller.
+
+Mappings are sanitized before `json.dumps`. Sensitive keys use the public
+name and suffix lists. Strings use the patterns in the security notes.
+Cycles become `"<circular>"`. Values that JSON cannot represent become
+`"<non-finite>"` or `"<unserializable TypeName>"`, using the type name rather
+than `repr`, so a secret stored only in `repr` is not emitted. Nested
+sanitizing stops after 20 levels.
+
 ## Import side effects
 
-Importing `pyforge` imports the retry module only. It does not configure the
-root logger, read environment files, or open a network connection.
+Importing `pyforge` imports the retry and logging modules. It does not
+configure the root logger, read environment files, or open a network
+connection.
 
 ## Known limitations
 
@@ -114,11 +135,12 @@ root logger, read environment files, or open a network connection.
   function passed as async sleep would block the event loop.
 - Only `async def` functions are detected as asynchronous. A plain function
   that returns a coroutine is treated as synchronous.
-- Logging redaction, configuration helpers, and HTTP retry policy are not
-  implemented, so this document does not claim those controls exist.
+- Log redaction is limited to the names, suffixes, and text patterns in the
+  security notes. Configuration helpers and HTTP retries are not implemented.
 
 ## Further documentation
 
 - [API reference](api-reference.md) for parameters, return values, and exceptions.
 - [Security notes](security.md) for idempotency, secrets, and dependencies.
-- [Changelog](../CHANGELOG.md) for the 0.1.0 alpha contents.
+- [Changelog](../CHANGELOG.md) for the 0.1.0 alpha and the unreleased logging work.
+- [ADR 0002](decisions/0002-structured-logging.md) for the logging decision.

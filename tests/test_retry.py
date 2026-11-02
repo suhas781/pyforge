@@ -734,7 +734,17 @@ async def test_task_cancellation_during_sleep_is_not_retried() -> None:
 
 
 def test_public_api_and_version_are_explicit() -> None:
-    assert pyforge.__all__ == ["RetryPolicy", "retry"]
+    assert pyforge.__all__ == [
+        "CONTEXT_FIELD_NAMES",
+        "REDACTED",
+        "SENSITIVE_FIELD_NAMES",
+        "SENSITIVE_FIELD_SUFFIXES",
+        "JsonFormatter",
+        "LogContext",
+        "RetryPolicy",
+        "get_logger",
+        "retry",
+    ]
     assert pyforge.__version__ == "0.1.0"
     assert pyforge.RetryPolicy is RetryPolicy
     assert pyforge.retry is retry

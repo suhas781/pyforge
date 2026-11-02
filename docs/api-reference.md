@@ -126,3 +126,85 @@ def fetch_remote_data() -> dict[str, str]:
 
 Retrying a remote write can repeat its side effects. Do that only when the
 operation is idempotent or the request carries an idempotency key.
+
+## JsonFormatter
+
+```python
+JsonFormatter()
+```
+
+`logging.Formatter` that returns one JSON object and no trailing newline.
+Handlers still add their own terminator. The object uses compact separators
+and sorted keys. Unicode is preserved (`ensure_ascii=False`). Non-finite
+floats are not emitted as `NaN` or `Infinity`.
+
+| Field | When present | Value |
+| --- | --- | --- |
+| `timestamp` | always | UTC time from `LogRecord.created`, millisecond precision, `Z` suffix |
+| `level` | always | `LogRecord.levelname`, including `DEBUG`, `INFO`, `WARNING`, `ERROR`, and `CRITICAL` |
+| `logger` | always | Logger name |
+| `message` | always | Redacted message. A mapping message becomes a JSON object. Other messages are formatted with the standard `%` arguments and then redacted. |
+| `request_id`, `operation`, `component` | attribute is present and not `None` | Sanitized value |
+| `attempt` | attribute is a non-boolean `int` greater than or equal to 0 | That integer |
+| `exception` | `exc_info` contains an exception type | Object with `type`, redacted `message`, and redacted `traceback` when a traceback exists |
+
+Record attributes other than those fields are ignored. In particular, an
+`extra` key such as `password` is not copied into the JSON object.
+
+`format` does not add handlers and does not change the root logger.
+
+## LogContext
+
+```python
+LogContext(
+    request_id: str | None = None,
+    operation: str | None = None,
+    attempt: int | None = None,
+    component: str | None = None,
+)
+```
+
+Frozen context for `get_logger`. Unknown keyword arguments raise `TypeError`.
+`request_id`, `operation`, and `component` must be strings or `None`.
+`attempt` must be an integer greater than or equal to 0, or `None`. Booleans
+are rejected. Invalid values raise `ValueError`.
+
+`to_dict()` returns only the fields that were set.
+
+## get_logger
+
+```python
+get_logger(name: str, *, context: LogContext | None = None) -> logging.LoggerAdapter
+```
+
+Return an adapter around `logging.getLogger(name)`. `name` must be a non-empty
+string other than `"root"`; otherwise `get_logger` raises `ValueError`.
+`context` must be a `LogContext` or `None`.
+
+This function does not attach handlers, change propagation, or configure the
+root logger. The caller configures handlers. Call-site `extra` must be a
+`dict` or `None` and overrides context fields for that call. `JsonFormatter`
+still drops extra keys that are not supported context fields.
+
+```python
+import logging
+
+from pyforge import JsonFormatter, LogContext, get_logger
+
+handler = logging.StreamHandler()
+handler.setFormatter(JsonFormatter())
+logger = get_logger(
+    "billing",
+    context=LogContext(component="api", operation="charge", attempt=1),
+)
+logger.logger.addHandler(handler)
+logger.logger.propagate = False
+logger.info("charged", extra={"request_id": "req-7"})
+```
+
+## Redaction constants
+
+`REDACTED` is `"[REDACTED]"`. `SENSITIVE_FIELD_NAMES` and
+`SENSITIVE_FIELD_SUFFIXES` are the exact key rules. `CONTEXT_FIELD_NAMES` is
+the exact context allowlist. The rules and their limits are in
+[Security notes](security.md).
