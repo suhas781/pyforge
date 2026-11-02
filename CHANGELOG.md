@@ -7,6 +7,9 @@ has been published, and this project has not been uploaded to PyPI.
 
 ### Added
 
+- `retry_http`, `should_retry_http`, and `raise_for_retryable_status` for HTTP
+  retry decisions. They reuse `RetryPolicy` and do not send requests.
+  Non-idempotent methods are not retried unless the caller opts in.
 - `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float` for one-shot
   environment reads. There is no `.env` loader, cache, or global registry.
 - `MissingEnvironmentError`, `InvalidEnvironmentError`, and
@@ -35,6 +38,6 @@ Alpha on `main`. This is the current library, not a production certification.
 
 ### Not included
 
-- HTTP retries.
-- A tagged release. Structured logging and environment configuration are listed
+- An HTTP client, socket timeouts, and exactly-once request execution.
+- A tagged release. Logging, configuration, and HTTP decisions are listed
   under Unreleased.

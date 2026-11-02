@@ -736,6 +736,9 @@ async def test_task_cancellation_during_sleep_is_not_retried() -> None:
 def test_public_api_and_version_are_explicit() -> None:
     assert pyforge.__all__ == [
         "CONTEXT_FIELD_NAMES",
+        "DEFAULT_RETRYABLE_HTTP_EXCEPTIONS",
+        "DEFAULT_RETRYABLE_STATUS_CODES",
+        "IDEMPOTENT_HTTP_METHODS",
         "REDACTED",
         "SENSITIVE_FIELD_NAMES",
         "SENSITIVE_FIELD_SUFFIXES",
@@ -745,12 +748,18 @@ def test_public_api_and_version_are_explicit() -> None:
         "MissingEnvironmentError",
         "OutOfRangeEnvironmentError",
         "RetryPolicy",
+        "RetryableHTTPStatus",
         "get_env",
         "get_env_bool",
         "get_env_float",
         "get_env_int",
         "get_logger",
+        "is_idempotent_method",
+        "is_retryable_status",
+        "raise_for_retryable_status",
         "retry",
+        "retry_http",
+        "should_retry_http",
     ]
     assert pyforge.__version__ == "0.1.0"
     assert pyforge.RetryPolicy is RetryPolicy
