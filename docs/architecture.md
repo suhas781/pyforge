@@ -3,13 +3,22 @@
 ## Scope
 
 PyForge is a dependency-free Python 3.11+ library. The implemented modules are
-bounded retry and JSON logging. Configuration helpers and HTTP resilience are
-later milestones and have no code yet.
+bounded retry, JSON logging, and environment-backed configuration. HTTP
+resilience is a later milestone and has no code yet.
 
 The public API is:
 
 ```python
-from pyforge import JsonFormatter, LogContext, RetryPolicy, get_logger, retry
+from pyforge import (
+    JsonFormatter,
+    LogContext,
+    RetryPolicy,
+    get_env,
+    get_env_bool,
+    get_env_int,
+    get_logger,
+    retry,
+)
 ```
 
 `pyforge.__version__` is `0.1.0`.
@@ -24,9 +33,11 @@ from pyforge import JsonFormatter, LogContext, RetryPolicy, get_logger, retry
 - `LogContext` and `get_logger`: optional `request_id`, `operation`,
   `attempt`, and `component` values. Unknown context keywords are rejected.
   Unknown `extra` keys stay off the JSON object.
-- `tests/test_retry.py` and `tests/test_logging.py`: deterministic unit tests.
-  Retry tests inject sleep and randomness. Logging tests inject records and
-  handlers.
+- `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float`: read one
+  environment variable when called. They do not cache it or load `.env` files.
+- `tests/test_retry.py`, `tests/test_logging.py`, and `tests/test_config.py`:
+  deterministic unit tests. Retry tests inject sleep and randomness. Logging
+  tests inject records and handlers. Configuration tests use `monkeypatch`.
 
 Tests stay in `tests/` until more than one module needs a split layout. There
 is no integration suite yet.
@@ -120,11 +131,29 @@ Cycles become `"<circular>"`. Values that JSON cannot represent become
 than `repr`, so a secret stored only in `repr` is not emitted. Nested
 sanitizing stops after 20 levels.
 
+## Environment configuration
+
+Each reader validates its arguments, then reads `os.environ` once. A later
+call reads the environment again. Nothing is written back.
+
+`get_env` returns the stored string. `get_env_bool`, `get_env_int`, and
+`get_env_float` strip surrounding whitespace before parsing. Accepted
+booleans are `true`, `1`, `yes`, `on`, `false`, `0`, `no`, and `off`, compared
+without case. Integers are base-10 digit strings with an optional sign.
+Floats also allow a decimal point and an exponent. `NaN` and infinities are
+rejected. Numeric bounds are inclusive.
+
+Missing required variables raise `MissingEnvironmentError`. A required
+`get_env` value of `""` does too. Blank text given to a typed reader is
+`InvalidEnvironmentError`, not a missing value. Numbers outside the bounds
+raise `OutOfRangeEnvironmentError`. Messages name the variable and the
+expected type or bounds, and omit the stored value.
+
 ## Import side effects
 
-Importing `pyforge` imports the retry and logging modules. It does not
-configure the root logger, read environment files, or open a network
-connection.
+Importing `pyforge` imports the retry, logging, and configuration modules. It
+does not configure the root logger, read environment variables, read `.env`
+files, or open a network connection.
 
 ## Known limitations
 
@@ -136,11 +165,14 @@ connection.
 - Only `async def` functions are detected as asynchronous. A plain function
   that returns a coroutine is treated as synchronous.
 - Log redaction is limited to the names, suffixes, and text patterns in the
-  security notes. Configuration helpers and HTTP retries are not implemented.
+  security notes. HTTP retries are not implemented.
+- Configuration readers return the parsed value. They do not redact it. A
+  caller that logs the returned string is responsible for that output.
 
 ## Further documentation
 
 - [API reference](api-reference.md) for parameters, return values, and exceptions.
 - [Security notes](security.md) for idempotency, secrets, and dependencies.
-- [Changelog](../CHANGELOG.md) for the 0.1.0 alpha and the unreleased logging work.
+- [Changelog](../CHANGELOG.md) for the 0.1.0 alpha and unreleased work.
 - [ADR 0002](decisions/0002-structured-logging.md) for the logging decision.
+- [ADR 0003](decisions/0003-environment-configuration.md) for the configuration decision.

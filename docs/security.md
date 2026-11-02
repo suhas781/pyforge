@@ -1,8 +1,9 @@
 # Security notes
 
-PyForge 0.1.0 is a small retry library. These notes describe the controls that
-exist in this version. They are not a security certification, threat model, or
-guarantee that a caller is safe from duplicate side effects.
+PyForge 0.1.0 is a small retry, logging, and configuration library. These notes
+describe the controls that exist in this version. They are not a security
+certification, threat model, or guarantee that a caller is safe from duplicate
+side effects.
 
 ## Idempotency
 
@@ -23,9 +24,11 @@ tuple such as `(Exception,)`. The default is that broad tuple; narrow it.
 
 ## Secrets and local files
 
-The runtime package does not read environment variables, `.env` files, or
-credential stores. Importing `pyforge` does not configure logging and does not
-open a network connection.
+Importing `pyforge` does not read environment variables, `.env` files, or
+credential stores, and it does not configure logging or open a network
+connection. `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float` read
+one `os.environ` entry when called. They do not load `.env` files and they do
+not write to `os.environ`.
 
 `.env` files are gitignored. `.env.example` contains only a comment and no
 credentials. Do not commit tokens, passwords, private keys, or customer data.
@@ -72,6 +75,21 @@ A field named `value`, `data`, or `password_policy` is not sensitive. A raw
 token with no matching key or pattern is not detected. Tracebacks do not
 include local variables; source lines are redacted only when they match a
 pattern above.
+
+## Environment values
+
+Configuration errors may include the variable name, the expected type, and the
+numeric bounds. They do not include the stored value or the default. The
+exception `__cause__` is left unset, so a parser error cannot attach the raw
+text. The readers do not log.
+
+That is not a redaction of the return value. `get_env("DATABASE_URL")` returns
+the URL as stored. If the caller logs that string, `JsonFormatter` applies
+only the text patterns above. A URL containing `password=supersecret` matches
+the assignment pattern. A URL that is only a raw token does not.
+
+The readers also do not inspect whether a variable name looks sensitive.
+`get_env("API_TOKEN")` returns the token. Callers should avoid logging it.
 
 ## Dependencies
 

@@ -208,3 +208,115 @@ logger.info("charged", extra={"request_id": "req-7"})
 `SENSITIVE_FIELD_SUFFIXES` are the exact key rules. `CONTEXT_FIELD_NAMES` is
 the exact context allowlist. The rules and their limits are in
 [Security notes](security.md).
+
+## Environment configuration
+
+These functions read `os.environ` on each call. They do not cache values,
+load `.env` files, or modify the process environment. Importing `pyforge` does
+not read environment variables.
+
+Names are used as stored. Windows environment lookup is case-insensitive;
+POSIX lookup is case-sensitive. PyForge does not normalize names.
+
+`required=True` and `default` cannot be used together. That raises
+`ValueError`. A non-string name raises `TypeError`. An empty name raises
+`ValueError`. `required` must be a boolean.
+
+```python
+from pyforge import get_env, get_env_bool, get_env_int
+
+database_url = get_env("DATABASE_URL", required=True)
+debug = get_env_bool("DEBUG", default=False)
+port = get_env_int("PORT", default=8000, minimum=1, maximum=65535)
+```
+
+### get_env
+
+```python
+get_env(name: str, *, default: str | None = None, required: bool = False) -> str | None
+```
+
+Returns the stored string unchanged, including surrounding whitespace. A
+missing optional variable returns `default`, or `None` when no default was
+passed. `MissingEnvironmentError` is raised when a required variable is unset
+or set to exactly `""`. A required whitespace-only value is returned as stored.
+The default, when passed, must be a string; otherwise
+`InvalidEnvironmentError` is raised before the lookup.
+
+### get_env_bool
+
+```python
+get_env_bool(name: str, *, default: bool | None = None, required: bool = False) -> bool | None
+```
+
+Surrounding whitespace is removed and the remaining text is compared
+case-insensitively.
+
+| Result | Accepted text |
+| --- | --- |
+| `True` | `true`, `1`, `yes`, `on` |
+| `False` | `false`, `0`, `no`, `off` |
+
+Any other text, including a blank value, raises `InvalidEnvironmentError`.
+A missing variable uses the same default and required rules as `get_env`.
+The default must be `True` or `False`, not `1`, `0`, or a string.
+
+### get_env_int
+
+```python
+get_env_int(
+    name: str,
+    *,
+    default: int | None = None,
+    required: bool = False,
+    minimum: int | None = None,
+    maximum: int | None = None,
+) -> int | None
+```
+
+Surrounding whitespace is removed. The text must be an optional `+` or `-`
+followed by decimal digits. `007` is accepted and parsed as `7`. Decimal
+points, exponents, underscores, and other bases are rejected with
+`InvalidEnvironmentError`.
+
+`minimum` and `maximum` are inclusive. A value outside them raises
+`OutOfRangeEnvironmentError`. The bounds must be integers; booleans are
+rejected with `TypeError`. If `minimum` is greater than `maximum`, the call
+raises `ValueError`.
+
+Defaults follow the same integer and bounds rules. `True` and `False` are
+rejected because they are not integers here. A bad default raises before the
+environment is read. A present variable replaces the default.
+
+### get_env_float
+
+```python
+get_env_float(
+    name: str,
+    *,
+    default: float | int | None = None,
+    required: bool = False,
+    minimum: float | int | None = None,
+    maximum: float | int | None = None,
+) -> float | None
+```
+
+Surrounding whitespace is removed. Decimal numbers and scientific notation
+such as `1e-3` are accepted. `NaN`, positive and negative infinity, overflow
+to infinity, underscores, and other non-numeric text raise
+`InvalidEnvironmentError`. Integer defaults are returned as `float` values.
+Bounds are inclusive and must be finite numbers. Non-finite bounds raise
+`ValueError`.
+
+### Configuration exceptions
+
+| Exception | When | Base |
+| --- | --- | --- |
+| `MissingEnvironmentError` | A required variable is unset, or a required `get_env` value is `""`. | `Exception` |
+| `InvalidEnvironmentError` | The text or default cannot be parsed as the requested type. | `ValueError` |
+| `OutOfRangeEnvironmentError` | A parsed number or numeric default is outside the inclusive bounds. | `ValueError` |
+
+`OutOfRangeEnvironmentError` is not a subclass of `InvalidEnvironmentError`.
+Catch `ValueError` to handle both. Messages include the variable name and the
+expected type or bounds. They do not include the environment value or the
+default value.

@@ -2,11 +2,11 @@
 
 **A production-minded Python engineering toolkit.**
 
-PyForge is a small, typed Python package for reusable engineering primitives. The current code covers bounded retries and JSON logging. Configuration helpers and HTTP examples are later milestones and are not implemented.
+PyForge is a small, typed Python package for reusable engineering primitives. The current code covers bounded retries, JSON logging, and environment-backed configuration. HTTP examples are a later milestone and are not implemented.
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: Milestone 2 structured logging is implemented and verified locally on Python 3.11. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity or structlog. Hosted CI for this branch has not been observed yet.
+> Status: Milestone 3 environment configuration is implemented and verified locally on Python 3.11. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, or pydantic-settings. Hosted CI for this branch has not been observed yet.
 
 ## Why PyForge exists
 
@@ -20,6 +20,7 @@ AI and backend systems are only as reliable as the code around them. PyForge sta
 - `asyncio.CancelledError` and other `BaseException` values propagate and are not retried
 - Injectable sleep and random functions so tests do not wait on real time
 - `JsonFormatter` and `get_logger` for one JSON object per record, without configuring the root logger
+- `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float` read one variable per call, with explicit defaults, required values, and numeric bounds
 - Standard-library-only runtime
 
 ## Safety
@@ -28,7 +29,7 @@ Retrying a call can repeat its side effects. Retry a remote write only when the 
 
 `retry_on` defaults to `(Exception,)`, which includes ordinary failures such as `ValueError` and `RuntimeError`. Pass a narrow tuple. `KeyboardInterrupt`, `SystemExit`, `GeneratorExit`, and `asyncio.CancelledError` are not caught.
 
-Importing `pyforge` does not configure the root logger and does not make network calls. JSON logging redacts only the names, suffixes, and text patterns in [Security notes](docs/security.md).
+Importing `pyforge` does not configure the root logger, read environment variables, or make network calls. JSON logging redacts only the names, suffixes, and text patterns in [Security notes](docs/security.md). Configuration errors omit the stored value; the returned value itself is not redacted.
 
 ## Quick start
 
@@ -64,6 +65,16 @@ def fetch_remote_data() -> dict[str, str]:
 
 `max_attempts` includes the first call. After the last matching failure, the original exception is raised with its type and message unchanged. Tests should inject `sleep` and `random_value` instead of waiting on `time.sleep` or `asyncio.sleep`.
 
+```python
+from pyforge import get_env, get_env_bool, get_env_int
+
+database_url = get_env("DATABASE_URL", required=True)
+debug = get_env_bool("DEBUG", default=False)
+port = get_env_int("PORT", default=8000, minimum=1, maximum=65535)
+```
+
+`get_env` returns the stored string. `DEBUG` accepts `true`, `1`, `yes`, `on`, `false`, `0`, `no`, and `off`. These functions do not load a `.env` file.
+
 ## Design principles
 
 1. Explicit behavior: retries are bounded and exception-aware.
@@ -78,18 +89,21 @@ def fetch_remote_data() -> dict[str, str]:
 pyforge/
 ├── src/pyforge/
 │   ├── __init__.py
+│   ├── config.py
 │   ├── logging.py
 │   ├── py.typed
 │   └── retry.py
 ├── tests/test_retry.py
 ├── tests/test_logging.py
+├── tests/test_config.py
 ├── docs/
 │   ├── architecture.md
 │   ├── api-reference.md
 │   ├── security.md
 │   └── decisions/
 │       ├── 0001-retry-policy.md
-│       └── 0002-structured-logging.md
+│       ├── 0002-structured-logging.md
+│       └── 0003-environment-configuration.md
 ├── scripts/check_distribution.py
 ├── .github/workflows/ci.yml
 ├── pyproject.toml
@@ -119,7 +133,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - [x] CI workflow for Python 3.11, 3.12, and 3.13, including package build and artifact checks
 - [x] Milestone 5: API reference, security notes, changelog, and distribution validation
 - [x] Milestone 2: structured JSON logging
-- [ ] Milestone 3: environment-backed configuration helpers
+- [x] Milestone 3: environment-backed configuration helpers
 - [ ] Milestone 4: optional HTTP resilience example
 - [ ] Milestone 6: tagged release after owner approval
 
@@ -128,10 +142,10 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - No distributed coordination, persistent retry state, circuit breaker, or rate limiter.
 - Jitter is a symmetric fraction around the capped backoff. It cannot extend a delay past `max_delay`, so the interval is not symmetric once the cap is hit.
 - Async sleep must be awaitable. Injecting a blocking sleep function would block the event loop.
-- Configuration helpers and HTTP retries are not implemented.
-- Log redaction covers only the field names, suffixes, and text patterns in `docs/security.md`. A value that does not match those rules is not detected.
+- HTTP retries are not implemented. Configuration readers do not load `.env` files or cache values.
+- Log redaction covers only the field names, suffixes, and text patterns in `docs/security.md`. A value that does not match those rules is not detected. Configuration functions return secrets as stored and only keep them out of error messages.
 - No benchmark numbers are published.
-- Hosted CI passed on Python 3.11, 3.12, and 3.13 for the retry-core baseline. This logging branch still needs its own completed workflow run.
+- Hosted CI for this configuration branch has not been observed yet. Python 3.12 and 3.13 were not run locally.
 
 ## License
 
