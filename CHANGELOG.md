@@ -7,6 +7,10 @@ has been published, and this project has not been uploaded to PyPI.
 
 ### Added
 
+- `MemoryCache` and `CacheStats` for a process-local LRU cache. Entries may
+  expire after a monotonic TTL. `max_entries` bounds the count. There is no
+  background thread, persistence, or shared cache. A stored `None` is present.
+  A missing or expired key is not.
 - `RetryEvent`, `RetryEventType`, and an optional `observer` for `retry` and
   `retry_http`. Events report a scheduled retry, a later success, or an
   exhausted attempt. The first successful attempt emits nothing. Events carry
@@ -16,7 +20,7 @@ has been published, and this project has not been uploaded to PyPI.
   retry decisions. They reuse `RetryPolicy` and do not send requests.
   Non-idempotent methods are not retried unless the caller opts in.
 - `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float` for one-shot
-  environment reads. There is no `.env` loader, cache, or global registry.
+  environment reads. There is no `.env` loader and no cached configuration.
 - `MissingEnvironmentError`, `InvalidEnvironmentError`, and
   `OutOfRangeEnvironmentError`. Error text omits the stored value.
 - `JsonFormatter`, `LogContext`, and `get_logger` for JSON logs.

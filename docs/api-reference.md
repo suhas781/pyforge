@@ -531,3 +531,59 @@ def fetch(url: str) -> str:
 record, and it still applies only the redaction rules in the security notes.
 PyForge does not install a handler, a metrics exporter, or a tracer. The
 `client` and its timeout belong to the caller.
+
+## MemoryCache
+
+```python
+MemoryCache(max_entries: int, *, clock: Callable[[], float] | None = None)
+```
+
+`max_entries` is an integer of at least 1. `True` and `False` are rejected.
+`clock` defaults to `time.monotonic`. Each reading must be a finite real
+number. The cache does not call `time.time`.
+
+```python
+cache.set(key, value, *, ttl: float | None = None) -> None
+cache.get(key, default) -> object
+cache.delete(key) -> bool
+cache.clear() -> None
+cache.stats() -> CacheStats
+cache.reset_stats() -> None
+key in cache
+len(cache)
+cache.max_entries
+```
+
+`key` must be hashable. `value` may be any object, including `None` or an
+exception instance. `get` returns that same object.
+
+| Call | Result |
+| --- | --- |
+| `set` with `ttl=None` | Stores the value until it is replaced, deleted, cleared, or evicted |
+| `set` with `ttl>0` | Expires when `clock() >= set_clock + ttl` |
+| `set` with `ttl=0` | Does not store the value. An existing key is removed. This is not an eviction |
+| `get` without a default | Returns the value, or raises `KeyError` when the key is missing or expired |
+| `get` with a default | Returns the default on a miss and does not store it |
+| `delete` | Returns `True` only when a live entry was removed |
+| `in` and `len` | Ignore expired entries. `in` does not count a hit or change LRU order |
+
+A negative, boolean, non-numeric, or non-finite `ttl` raises `TypeError` or
+`ValueError`. The same applies to a clock reading and to `max_entries`.
+
+`CacheStats` is a frozen snapshot of `hits`, `misses`, and `evictions`. A hit
+is a `get` of a live entry. A miss is a `get` of a missing or expired entry.
+An eviction is a live entry removed because the cache is at `max_entries`.
+`clear` and `reset_stats` do not affect each other: one drops entries, the
+other zeros counters.
+
+```python
+from pyforge import MemoryCache
+
+cache = MemoryCache(max_entries=2)
+cache.set("profile:42", {"status": "ok"}, ttl=30)
+profile = cache.get("profile:42", None)
+```
+
+The default clock is `time.monotonic`. Tests can pass a callable that returns
+a controlled number. The cache reads that callable before it takes its lock.
+There is no background cleanup, no persistence, and no shared cache.
