@@ -2,11 +2,11 @@
 
 **A production-minded Python engineering toolkit.**
 
-PyForge is a small, typed Python package for reusable engineering primitives. The current code covers bounded retries, JSON logging, environment-backed configuration, HTTP retry decisions, optional retry events, and a process-local memory cache. It does not include an HTTP client or a metrics backend.
+PyForge is a small, typed Python package for reusable engineering primitives. The current code covers bounded retries, JSON logging, environment-backed configuration, HTTP retry decisions, optional retry events, a process-local memory cache, and deterministic test helpers. It does not include an HTTP client or a metrics backend.
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: The in-memory cache is implemented. Local checks ran on Python 3.11, and the GitHub Actions run for this branch reported success on Python 3.11, 3.12, and 3.13. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, cachetools, or an HTTP client.
+> Status: Deterministic test helpers are implemented. Local checks ran on Python 3.11, and the GitHub Actions run for this branch reported success on Python 3.11, 3.12, and 3.13. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, cachetools, pytest, or an HTTP client.
 
 ## Why PyForge exists
 
@@ -24,6 +24,7 @@ AI and backend systems are only as reliable as the code around them. PyForge sta
 - `retry_http` and `should_retry_http` classify idempotent methods and retryable HTTP statuses, then reuse `RetryPolicy`
 - `RetryEvent` callbacks report scheduled retries, later success, and exhausted attempts without a metrics library
 - `MemoryCache` stores process-local values with an optional TTL, a fixed entry limit, and LRU eviction
+- `pyforge.testing` provides a fake monotonic clock, recorded sleep, scripted calls, and a temporary environment block for tests
 - Standard-library-only runtime
 
 ## Safety
@@ -101,6 +102,30 @@ profile = cache.get("profile:42", None)
 
 `ttl` is seconds on a monotonic clock. `get` returns the stored object, including a stored `None`. A missing or expired key raises `KeyError` when no default is passed. The cache is not shared across processes and it does not persist.
 
+```python
+from pyforge import RetryPolicy, retry
+from pyforge.testing import FailThenReturn, RecordingSleeper
+
+sleeper = RecordingSleeper()
+calls = FailThenReturn(2, "ok")
+
+
+@retry(
+    policy=RetryPolicy(max_attempts=3, jitter=0),
+    retry_on=(TimeoutError,),
+    sleep=sleeper,
+)
+def fetch() -> str:
+    return calls()
+
+
+assert fetch() == "ok"
+assert calls.count == 3
+assert sleeper.delays == (0.25, 0.5)
+```
+
+`RecordingSleeper` does not sleep. `FailThenReturn` raises `TimeoutError` twice, then returns `"ok"`. Import these helpers from `pyforge.testing`. Importing `pyforge` does not load them.
+
 ## Design principles
 
 1. Explicit behavior: retries are bounded and exception-aware.
@@ -121,13 +146,15 @@ pyforge/
 │   ├── logging.py
 │   ├── observe.py
 │   ├── py.typed
-│   └── retry.py
+│   ├── retry.py
+│   └── testing.py
 ├── tests/test_cache.py
 ├── tests/test_retry.py
 ├── tests/test_logging.py
 ├── tests/test_config.py
 ├── tests/test_http.py
 ├── tests/test_observe.py
+├── tests/test_testing.py
 ├── docs/
 │   ├── architecture.md
 │   ├── api-reference.md
@@ -138,7 +165,8 @@ pyforge/
 │       ├── 0003-environment-configuration.md
 │       ├── 0004-http-resilience.md
 │       ├── 0005-retry-observability.md
-│       └── 0006-in-memory-cache.md
+│       ├── 0006-in-memory-cache.md
+│       └── 0007-testing-utilities.md
 ├── scripts/check_distribution.py
 ├── .github/workflows/ci.yml
 ├── pyproject.toml
@@ -172,6 +200,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - [x] Milestone 4: HTTP retry decisions on top of the retry engine
 - [x] Retry observability callbacks for scheduled, succeeded, and exhausted attempts
 - [x] In-memory cache with TTL, LRU eviction, and an injected monotonic clock
+- [x] Test helpers for a fake clock, recorded sleep, scripted calls, and temporary environment values
 - [ ] Milestone 6: tagged release after owner approval
 
 ## Limitations
@@ -184,6 +213,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - Log redaction covers only the field names, suffixes, and text patterns in `docs/security.md`. A value that does not match those rules is not detected. Configuration functions return secrets as stored and only keep them out of error messages.
 - Retry events carry the exception class name, not the message. PyForge does not ship a metrics backend or distributed tracer. An ordinary observer exception is discarded.
 - `MemoryCache` bounds the number of entries, not their size. It does not persist, encrypt, or share entries across processes. A restart drops the cache. Key hashing and equality run while the instance lock is held.
+- `pyforge.testing` is for tests. `temporary_env` changes the process environment for the names it is given, and those names are visible to every thread until the block exits. The helpers do not patch `time.sleep` or `asyncio.sleep`.
 - No benchmark numbers are published.
 - Python 3.12 and 3.13 were not run locally. The GitHub Actions run for this branch reported success on 3.11, 3.12, and 3.13.
 
