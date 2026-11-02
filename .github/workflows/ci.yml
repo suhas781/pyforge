@@ -54,10 +54,10 @@ jobs:
         run: |
           python -m venv "$RUNNER_TEMP/from-wheel"
           "$RUNNER_TEMP/from-wheel/bin/python" -m pip install dist/*.whl
-          "$RUNNER_TEMP/from-wheel/bin/python" -c "from pyforge import RetryPolicy, retry; assert RetryPolicy().delay_for(1) == 0.25; assert callable(retry)"
+          "$RUNNER_TEMP/from-wheel/bin/python" -c "import json, logging; from pyforge import JsonFormatter, RetryPolicy, retry; record = logging.LogRecord('t', logging.INFO, 'x', 1, 'ok', (), None); assert json.loads(JsonFormatter().format(record))['message'] == 'ok'; assert RetryPolicy().delay_for(1) == 0.25; assert callable(retry)"
 
       - name: Install the sdist in a clean environment
         run: |
           python -m venv "$RUNNER_TEMP/from-sdist"
           "$RUNNER_TEMP/from-sdist/bin/python" -m pip install dist/*.tar.gz
-          "$RUNNER_TEMP/from-sdist/bin/python" -c "from pyforge import RetryPolicy; assert RetryPolicy().max_attempts == 3"
+          "$RUNNER_TEMP/from-sdist/bin/python" -c "from pyforge import JsonFormatter, RetryPolicy; assert RetryPolicy().max_attempts == 3; assert callable(JsonFormatter)"

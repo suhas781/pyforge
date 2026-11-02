@@ -2,11 +2,11 @@
 
 **A production-minded Python engineering toolkit.**
 
-PyForge is a small, typed Python package for reusable engineering primitives. The current release scope is bounded retries for synchronous and asynchronous callables. Structured logging, configuration helpers, and HTTP examples are later milestones and are not implemented.
+PyForge is a small, typed Python package for reusable engineering primitives. The current code covers bounded retries and JSON logging. Configuration helpers and HTTP examples are later milestones and are not implemented.
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: Milestone 1 retry core. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity.
+> Status: Milestone 2 structured logging is implemented and verified locally on Python 3.11. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity or structlog. Hosted CI for this branch has not been observed yet.
 
 ## Why PyForge exists
 
@@ -19,6 +19,7 @@ AI and backend systems are only as reliable as the code around them. PyForge sta
 - Retries only configured `Exception` subclasses, then re-raises the final exception unchanged
 - `asyncio.CancelledError` and other `BaseException` values propagate and are not retried
 - Injectable sleep and random functions so tests do not wait on real time
+- `JsonFormatter` and `get_logger` for one JSON object per record, without configuring the root logger
 - Standard-library-only runtime
 
 ## Safety
@@ -27,7 +28,7 @@ Retrying a call can repeat its side effects. Retry a remote write only when the 
 
 `retry_on` defaults to `(Exception,)`, which includes ordinary failures such as `ValueError` and `RuntimeError`. Pass a narrow tuple. `KeyboardInterrupt`, `SystemExit`, `GeneratorExit`, and `asyncio.CancelledError` are not caught.
 
-Importing `pyforge` does not configure logging and does not make network calls.
+Importing `pyforge` does not configure the root logger and does not make network calls. JSON logging redacts only the names, suffixes, and text patterns in [Security notes](docs/security.md).
 
 ## Quick start
 
@@ -77,14 +78,18 @@ def fetch_remote_data() -> dict[str, str]:
 pyforge/
 ├── src/pyforge/
 │   ├── __init__.py
+│   ├── logging.py
 │   ├── py.typed
 │   └── retry.py
 ├── tests/test_retry.py
+├── tests/test_logging.py
 ├── docs/
 │   ├── architecture.md
 │   ├── api-reference.md
 │   ├── security.md
-│   └── decisions/0001-retry-policy.md
+│   └── decisions/
+│       ├── 0001-retry-policy.md
+│       └── 0002-structured-logging.md
 ├── scripts/check_distribution.py
 ├── .github/workflows/ci.yml
 ├── pyproject.toml
@@ -113,7 +118,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - [x] Milestone 1: sync and async retry core, validation, and deterministic tests
 - [x] CI workflow for Python 3.11, 3.12, and 3.13, including package build and artifact checks
 - [x] Milestone 5: API reference, security notes, changelog, and distribution validation
-- [ ] Milestone 2: structured logging
+- [x] Milestone 2: structured JSON logging
 - [ ] Milestone 3: environment-backed configuration helpers
 - [ ] Milestone 4: optional HTTP resilience example
 - [ ] Milestone 6: tagged release after owner approval
@@ -123,9 +128,10 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - No distributed coordination, persistent retry state, circuit breaker, or rate limiter.
 - Jitter is a symmetric fraction around the capped backoff. It cannot extend a delay past `max_delay`, so the interval is not symmetric once the cap is hit.
 - Async sleep must be awaitable. Injecting a blocking sleep function would block the event loop.
-- Logging, configuration helpers, secret redaction, and HTTP retries are not implemented.
+- Configuration helpers and HTTP retries are not implemented.
+- Log redaction covers only the field names, suffixes, and text patterns in `docs/security.md`. A value that does not match those rules is not detected.
 - No benchmark numbers are published.
-- The GitHub Actions workflow defines Python 3.12 and 3.13 jobs. Those hosted runs are not treated as results unless they have actually completed.
+- Hosted CI passed on Python 3.11, 3.12, and 3.13 for the retry-core baseline. This logging branch still needs its own completed workflow run.
 
 ## License
 

@@ -35,11 +35,43 @@ of file contents and not a promise that every secret pattern will be found.
 
 ## Logging
 
-Structured logging is not implemented. This version has no redaction filter
-because it does not write log records. Callers that log retries themselves
-should keep authorization headers, passwords, tokens, and raw sensitive
-payloads out of those logs. A future logging module must not turn on the root
-logger at import time.
+`JsonFormatter` writes JSON. Importing `pyforge` or `pyforge.logging` does not
+configure the root logger, attach handlers, or change log levels. Callers
+attach a handler themselves.
+
+Redaction is exact and limited. It is not a general secret scanner.
+
+These mapping keys are replaced with `"[REDACTED]"` before serialization.
+Comparison is case-insensitive, and hyphens are treated as underscores.
+CamelCase is not split, so `sessionToken` is not matched.
+
+- Exact names: `password`, `passwd`, `token`, `access_token`,
+  `refresh_token`, `id_token`, `authorization`, `secret`, `api_key`, `apikey`.
+- Suffixes: `_password`, `_passwd`, `_token`, `_secret`, `_api_key`,
+  `_authorization`.
+
+The same replacement is used for the whole value. Nested values under a
+sensitive key are not inspected and are not emitted.
+
+These text patterns are rewritten in messages, context strings, exception
+messages, and tracebacks:
+
+- `Authorization:` followed by an optional `Bearer` and a token becomes
+  `Authorization: [REDACTED]`.
+- A remaining `Bearer` token becomes `Bearer [REDACTED]`.
+- `password`, `passwd`, `token`, `access_token`, `refresh_token`, `id_token`,
+  `api_key`, `apikey`, or `secret`, followed by `=` or `:`, becomes
+  `name=[REDACTED]`. The value runs until whitespace.
+
+Unsupported `extra` keys are omitted from the JSON object, so a password
+passed only under an unknown extra key is not written. Context fields are not
+themselves sensitive names: `component="hunter2"` is logged, while
+`component="password=hunter2"` matches the text pattern.
+
+A field named `value`, `data`, or `password_policy` is not sensitive. A raw
+token with no matching key or pattern is not detected. Tracebacks do not
+include local variables; source lines are redacted only when they match a
+pattern above.
 
 ## Dependencies
 
