@@ -168,9 +168,14 @@ import it.
 
 Minimum versions are declared in `pyproject.toml`. They are not hash-pinned.
 GitHub Actions are pinned to major tags (`actions/checkout@v4` and
-`actions/setup-python@v5`), not to commit SHAs. Review any new dependency
-before adding it, and do not add a runtime dependency for a feature that the
-standard library already covers.
+`actions/setup-python@v5`), not to commit SHAs. This repository does not run
+`pip-audit`, `safety`, or another vulnerability database in CI. Absence of a
+scanner result is not a claim that those tools are free of issues. Review any
+new dependency before adding it, and do not add a runtime dependency for a
+feature that the standard library already covers.
+
+CI does not publish artifacts. A later upload is a separate owner decision
+described in the release checklist.
 
 ## Package contents
 

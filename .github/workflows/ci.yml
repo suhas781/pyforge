@@ -1,5 +1,7 @@
 name: CI
 
+# Quality checks only. This workflow does not create tags, GitHub releases, or PyPI uploads.
+
 on:
   push:
     branches: [main]
