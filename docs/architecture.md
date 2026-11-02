@@ -3,15 +3,18 @@
 ## Scope
 
 PyForge is a dependency-free Python 3.11+ library. The implemented modules are
-bounded retry, JSON logging, environment-backed configuration, and HTTP retry
-decisions. There is no HTTP client in the package.
+bounded retry, JSON logging, environment-backed configuration, HTTP retry
+decisions, retry events, and a process-local memory cache. There is no HTTP
+client in the package.
 
 The public API is:
 
 ```python
 from pyforge import (
+    CacheStats,
     JsonFormatter,
     LogContext,
+    MemoryCache,
     RetryPolicy,
     get_env,
     get_env_bool,
@@ -42,11 +45,15 @@ from pyforge import (
   `retry` for the attempt limit and delay.
 - `RetryEvent` and the optional `observer`: report scheduled retries, later
   success, and exhausted attempts. There is no global observer.
+- `MemoryCache`: one instance owns an ordered mapping, a lock, and counters.
+  There is no process-wide cache.
 - `tests/test_retry.py`, `tests/test_logging.py`, `tests/test_config.py`,
-  `tests/test_http.py`, and `tests/test_observe.py`: deterministic unit tests.
+  `tests/test_http.py`, `tests/test_observe.py`, and `tests/test_cache.py`:
+  deterministic unit tests.
   Retry and HTTP tests inject sleep and randomness. Logging tests inject
   records and handlers. Configuration tests use `monkeypatch`. HTTP tests use
-  fakes and do not open sockets.
+  fakes and do not open sockets. Cache tests inject a monotonic clock and do
+  not sleep.
 
 Tests stay in `tests/` until more than one module needs a split layout. There
 is no integration suite yet.
@@ -207,12 +214,44 @@ HTTP lifecycle events name `RetryableHTTPStatus`. They do not repeat the
 decision made by `should_retry_http`, and they do not include response bodies,
 headers, or exception messages.
 
+## In-memory cache
+
+`MemoryCache` is a synchronous mapping with three extra rules: a maximum
+number of live entries, an optional monotonic TTL, and LRU eviction.
+
+`set` records the clock reading for that call. The entry expires when a later
+reading is greater than or equal to that time plus `ttl`. `get` does not
+extend the TTL. `ttl=None` does not expire. `ttl=0` is already expired and is
+not stored. A negative, boolean, non-numeric, or non-finite TTL is rejected.
+
+Expiration is lazy. `get`, `set`, `delete`, `in`, and `len` drop expired
+entries before they do their own work. Nothing scans the cache on a
+background thread.
+
+When a new key would exceed `max_entries`, the least recently used live entry
+is removed and `evictions` increases by one. `get` and a replacement `set`
+move the key to the newest position. `in` does not. Deleting, clearing, or
+expiring an entry is not an eviction.
+
+The clock is read before the instance lock is acquired. The mapping lookup
+still hashes and compares keys while the lock is held. A key's `__hash__` or
+`__eq__` must not call back into the same cache.
+
+Returned values are the stored objects. The cache does not copy them and does
+not treat an exception object as a failure. A stored `None` is a hit. A
+missing or expired key raises `KeyError` unless `get` was given a default.
+That error text does not include the key.
+
+`stats` returns a frozen snapshot. `clear` drops entries and leaves the
+counters unchanged. `reset_stats` zeros the counters and leaves the entries
+unchanged.
+
 ## Import side effects
 
 Importing `pyforge` imports the retry, logging, configuration, HTTP decision,
-and observability modules. It does not configure the root logger, read
-environment variables, read `.env` files, register an observer, or open a
-network connection.
+observability, and cache modules. It does not configure the root logger, read
+environment variables, read `.env` files, register an observer, start a
+thread, or open a network connection.
 
 ## Known limitations
 
@@ -232,6 +271,10 @@ network connection.
   the server implements with side effects is still treated as idempotent.
 - Observers are not a metrics or tracing system. A discarded observer
   exception is not logged, because the engine does not configure logging.
+- `MemoryCache` is process memory. It is not a shared or durable store.
+  `max_entries` does not limit bytes. A backwards clock jump keeps entries
+  alive until a later reading reaches their expiration time. Check-then-set
+  across two calls is not one atomic operation.
 
 ## Further documentation
 
@@ -242,3 +285,4 @@ network connection.
 - [ADR 0003](decisions/0003-environment-configuration.md) for the configuration decision.
 - [ADR 0004](decisions/0004-http-resilience.md) for the HTTP retry decision.
 - [ADR 0005](decisions/0005-retry-observability.md) for the observer decision.
+- [ADR 0006](decisions/0006-in-memory-cache.md) for the cache decision.

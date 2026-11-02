@@ -17,6 +17,7 @@ EXPECTED_NAME = "pyforge-toolkit"
 EXPECTED_VERSION = "0.1.0"
 WHEEL_FILES = (
     "pyforge/__init__.py",
+    "pyforge/cache.py",
     "pyforge/config.py",
     "pyforge/http.py",
     "pyforge/logging.py",
@@ -29,6 +30,7 @@ SDIST_SUFFIXES = (
     "README.md",
     "LICENSE",
     "src/pyforge/__init__.py",
+    "src/pyforge/cache.py",
     "src/pyforge/config.py",
     "src/pyforge/http.py",
     "src/pyforge/logging.py",

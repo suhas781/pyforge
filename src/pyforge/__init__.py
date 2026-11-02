@@ -1,5 +1,6 @@
 """PyForge: a production-minded Python engineering toolkit."""
 
+from pyforge.cache import CacheStats, MemoryCache
 from pyforge.config import (
     InvalidEnvironmentError,
     MissingEnvironmentError,
@@ -40,9 +41,11 @@ __all__ = [
     "REDACTED",
     "SENSITIVE_FIELD_NAMES",
     "SENSITIVE_FIELD_SUFFIXES",
+    "CacheStats",
     "InvalidEnvironmentError",
     "JsonFormatter",
     "LogContext",
+    "MemoryCache",
     "MissingEnvironmentError",
     "OutOfRangeEnvironmentError",
     "RetryEvent",

@@ -120,6 +120,27 @@ the assignment pattern. A URL that is only a raw token does not.
 The readers also do not inspect whether a variable name looks sensitive.
 `get_env("API_TOKEN")` returns the token. Callers should avoid logging it.
 
+## Process-local cache
+
+`MemoryCache` keeps values in the process that created it. Those values are
+ordinary references. A cached token or profile stays readable to other code
+in the same process until the entry expires, is evicted, is deleted, or the
+process exits. The cache does not encrypt values, and it does not redact
+them. Do not log a cached value unless it is already safe to log.
+
+The `KeyError` for a missing or expired key says that the entry is missing or
+expired. It does not include the key. Callers should still avoid putting raw
+secrets in keys, because key equality and hashing run inside the cache and a
+custom key type could reveal itself.
+
+Expiration and eviction are local. Another process, host, or later restart
+does not observe them. Do not use the cache as the only copy of an
+authorization decision that must be revoked everywhere at once.
+
+The cache does not start a thread and does not read the environment. A clock
+callback runs without the cache lock. Key hashing and equality run with the
+lock held, so a key that calls back into the same cache can deadlock.
+
 ## Dependencies
 
 The installed library has no runtime dependencies. Development tools are
