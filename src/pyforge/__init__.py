@@ -1,5 +1,14 @@
 """PyForge: a production-minded Python engineering toolkit."""
 
+from pyforge.config import (
+    InvalidEnvironmentError,
+    MissingEnvironmentError,
+    OutOfRangeEnvironmentError,
+    get_env,
+    get_env_bool,
+    get_env_float,
+    get_env_int,
+)
 from pyforge.logging import (
     CONTEXT_FIELD_NAMES,
     REDACTED,
@@ -16,9 +25,16 @@ __all__ = [
     "REDACTED",
     "SENSITIVE_FIELD_NAMES",
     "SENSITIVE_FIELD_SUFFIXES",
+    "InvalidEnvironmentError",
     "JsonFormatter",
     "LogContext",
+    "MissingEnvironmentError",
+    "OutOfRangeEnvironmentError",
     "RetryPolicy",
+    "get_env",
+    "get_env_bool",
+    "get_env_float",
+    "get_env_int",
     "get_logger",
     "retry",
 ]

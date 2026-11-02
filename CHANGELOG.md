@@ -7,6 +7,10 @@ has been published, and this project has not been uploaded to PyPI.
 
 ### Added
 
+- `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float` for one-shot
+  environment reads. There is no `.env` loader, cache, or global registry.
+- `MissingEnvironmentError`, `InvalidEnvironmentError`, and
+  `OutOfRangeEnvironmentError`. Error text omits the stored value.
 - `JsonFormatter`, `LogContext`, and `get_logger` for JSON logs.
 - UTC timestamps, level, logger name, message, optional context fields, and
   exception type, message, and traceback.
@@ -31,5 +35,6 @@ Alpha on `main`. This is the current library, not a production certification.
 
 ### Not included
 
-- Environment configuration helpers and HTTP retries.
-- A tagged release. Structured logging is listed under Unreleased.
+- HTTP retries.
+- A tagged release. Structured logging and environment configuration are listed
+  under Unreleased.
