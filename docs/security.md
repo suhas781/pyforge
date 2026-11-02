@@ -1,16 +1,27 @@
 # Security notes
 
-PyForge 0.1.0 is a small retry, logging, and configuration library. These notes
-describe the controls that exist in this version. They are not a security
-certification, threat model, or guarantee that a caller is safe from duplicate
-side effects.
+PyForge 0.1.0 is a small retry, logging, configuration, and HTTP-decision
+library. These notes describe the controls that exist in this version. They
+are not a security certification, threat model, or guarantee that a caller is
+safe from duplicate side effects.
 
 ## Idempotency
 
 The retry decorator repeats a failed call. A remote write, payment, or other
 non-idempotent operation can run more than once. PyForge does not create
-idempotency keys, compare responses, or decide whether an operation is safe to
-repeat. Callers have to do that before they configure `retry_on`.
+idempotency keys, compare responses, or prove that a server processed a
+request once.
+
+`retry_http` narrows that choice for HTTP. It retries idempotent methods when
+the status or transport exception is eligible. `POST`, `PATCH`, and other
+non-idempotent methods are not retried unless `allow_unsafe_method=True`. The
+flag is the caller's statement that an idempotency key, or an equivalent
+server guarantee, is already in place. The library does not generate the key,
+send the header, or check that the server honored it.
+
+A client timeout is not evidence that the server did nothing. Retrying after
+a timeout can apply the same POST twice when no idempotency guarantee exists.
+Nothing in this package provides exactly-once execution.
 
 ## Exception and cancellation boundaries
 
@@ -20,15 +31,19 @@ interrupts, and system exit therefore propagate instead of being retried.
 
 That behavior depends on the caller passing real `Exception` types and on
 CPython's exception hierarchy. It does not stop a caller from retrying a broad
-tuple such as `(Exception,)`. The default is that broad tuple; narrow it.
+tuple such as `(Exception,)`. The default for `retry` is that broad tuple;
+narrow it. `retry_http` defaults to `TimeoutError` and `ConnectionError`.
 
 ## Secrets and local files
 
 Importing `pyforge` does not read environment variables, `.env` files, or
 credential stores, and it does not configure logging or open a network
-connection. `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float` read
-one `os.environ` entry when called. They do not load `.env` files and they do
-not write to `os.environ`.
+connection. The HTTP helpers do not send requests. `RetryableHTTPStatus`
+records the method, status code, and exception class name only; it does not
+copy a response body or the original exception message. `get_env`,
+`get_env_bool`, `get_env_int`, and `get_env_float` read one `os.environ`
+entry when called. They do not load `.env` files and they do not write to
+`os.environ`.
 
 `.env` files are gitignored. `.env.example` contains only a comment and no
 credentials. Do not commit tokens, passwords, private keys, or customer data.

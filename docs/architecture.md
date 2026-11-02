@@ -3,8 +3,8 @@
 ## Scope
 
 PyForge is a dependency-free Python 3.11+ library. The implemented modules are
-bounded retry, JSON logging, and environment-backed configuration. HTTP
-resilience is a later milestone and has no code yet.
+bounded retry, JSON logging, environment-backed configuration, and HTTP retry
+decisions. There is no HTTP client in the package.
 
 The public API is:
 
@@ -18,6 +18,8 @@ from pyforge import (
     get_env_int,
     get_logger,
     retry,
+    retry_http,
+    should_retry_http,
 )
 ```
 
@@ -35,9 +37,13 @@ from pyforge import (
   Unknown `extra` keys stay off the JSON object.
 - `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float`: read one
   environment variable when called. They do not cache it or load `.env` files.
-- `tests/test_retry.py`, `tests/test_logging.py`, and `tests/test_config.py`:
-  deterministic unit tests. Retry tests inject sleep and randomness. Logging
-  tests inject records and handlers. Configuration tests use `monkeypatch`.
+- `should_retry_http`, `raise_for_retryable_status`, and `retry_http`: decide
+  whether an HTTP status or transport exception may be retried, then reuse
+  `retry` for the attempt limit and delay.
+- `tests/test_retry.py`, `tests/test_logging.py`, `tests/test_config.py`, and
+  `tests/test_http.py`: deterministic unit tests. Retry tests inject sleep and
+  randomness. Logging tests inject records and handlers. Configuration tests
+  use `monkeypatch`. HTTP tests use fakes and do not open sockets.
 
 Tests stay in `tests/` until more than one module needs a split layout. There
 is no integration suite yet.
@@ -149,11 +155,34 @@ Missing required variables raise `MissingEnvironmentError`. A required
 raise `OutOfRangeEnvironmentError`. Messages name the variable and the
 expected type or bounds, and omit the stored value.
 
+## HTTP retry decisions
+
+`retry_http` validates the method and exception tuple, then decorates the
+callable with the existing `retry` helper. The only exception that helper
+retries is `RetryableHTTPStatus`, so the attempt limit, jitter, injected
+sleep, and cancellation behavior stay in one place.
+
+A transport exception is translated into `RetryableHTTPStatus` only when the
+method is idempotent or `allow_unsafe_method` is true, and the exception
+matches `retry_on`. The default tuple is `TimeoutError` and `ConnectionError`.
+The translated message keeps the class name and drops the original text.
+
+Status codes are not read from the return value, because PyForge has no
+response type. The callable calls `raise_for_retryable_status` with the status
+it received. The default retryable codes are 408, 429, 500, 502, 503, and 504.
+
+Idempotent methods follow RFC 9110: GET, HEAD, OPTIONS, PUT, DELETE, and
+TRACE. POST and PATCH are not retried unless the caller opts in. The opt-in
+does not send an `Idempotency-Key`; the caller must already have done that on
+the client. There is no timeout parameter. The transport owns the deadline. A
+client timeout does not prove the server ignored the request, and a later
+attempt can duplicate a write.
+
 ## Import side effects
 
-Importing `pyforge` imports the retry, logging, and configuration modules. It
-does not configure the root logger, read environment variables, read `.env`
-files, or open a network connection.
+Importing `pyforge` imports the retry, logging, configuration, and HTTP
+decision modules. It does not configure the root logger, read environment
+variables, read `.env` files, or open a network connection.
 
 ## Known limitations
 
@@ -165,9 +194,12 @@ files, or open a network connection.
 - Only `async def` functions are detected as asynchronous. A plain function
   that returns a coroutine is treated as synchronous.
 - Log redaction is limited to the names, suffixes, and text patterns in the
-  security notes. HTTP retries are not implemented.
+  security notes.
 - Configuration readers return the parsed value. They do not redact it. A
   caller that logs the returned string is responsible for that output.
+- HTTP decisions do not send requests or enforce timeouts. They do not make a
+  POST exactly once. A method is classified only by its name, so a GET that
+  the server implements with side effects is still treated as idempotent.
 
 ## Further documentation
 
@@ -176,3 +208,4 @@ files, or open a network connection.
 - [Changelog](../CHANGELOG.md) for the 0.1.0 alpha and unreleased work.
 - [ADR 0002](decisions/0002-structured-logging.md) for the logging decision.
 - [ADR 0003](decisions/0003-environment-configuration.md) for the configuration decision.
+- [ADR 0004](decisions/0004-http-resilience.md) for the HTTP retry decision.

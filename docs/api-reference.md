@@ -320,3 +320,142 @@ Bounds are inclusive and must be finite numbers. Non-finite bounds raise
 Catch `ValueError` to handle both. Messages include the variable name and the
 expected type or bounds. They do not include the environment value or the
 default value.
+
+## HTTP retry decisions
+
+PyForge does not send HTTP requests and does not set a socket timeout. Configure
+the timeout on the client that performs the call. A timeout means the client
+stopped waiting. It does not mean the server skipped the request. Retrying can
+repeat a side effect. This is not an exactly-once guarantee.
+
+`IDEMPOTENT_HTTP_METHODS` is `DELETE`, `GET`, `HEAD`, `OPTIONS`, `PUT`, and
+`TRACE`. `POST`, `PATCH`, `CONNECT`, and any other method are not idempotent.
+`DEFAULT_RETRYABLE_STATUS_CODES` is `408`, `429`, `500`, `502`, `503`, and
+`504`. `DEFAULT_RETRYABLE_HTTP_EXCEPTIONS` is `(TimeoutError, ConnectionError)`.
+
+### is_idempotent_method
+
+```python
+is_idempotent_method(method: str) -> bool
+```
+
+Comparison strips surrounding whitespace and ignores case. A non-string raises
+`TypeError`. An empty or non-alphabetic token raises `ValueError`.
+
+### is_retryable_status
+
+```python
+is_retryable_status(
+    status_code: int,
+    *,
+    retryable_statuses: Collection[int] | None = None,
+) -> bool
+```
+
+`None` uses the default set. An empty collection matches nothing. Status codes
+must be integers from 100 to 599. Booleans are rejected.
+
+### should_retry_http
+
+```python
+should_retry_http(
+    method: str,
+    *,
+    status_code: int | None = None,
+    exception: BaseException | None = None,
+    allow_unsafe_method: bool = False,
+    retryable_statuses: Collection[int] | None = None,
+    retry_on: tuple[type[Exception], ...] = DEFAULT_RETRYABLE_HTTP_EXCEPTIONS,
+) -> bool
+```
+
+Pass a status code or an exception, not both and not neither. The result is
+`False` for a non-idempotent method unless `allow_unsafe_method` is `True`.
+That flag does not create an idempotency key. It records that the caller
+already has one, or an equivalent guarantee. Exceptions match `retry_on` by
+`isinstance`, including subclasses. `CancelledError`, `KeyboardInterrupt`, and
+`SystemExit` cannot be placed in `retry_on`.
+
+### raise_for_retryable_status
+
+```python
+raise_for_retryable_status(
+    method: str,
+    status_code: int,
+    *,
+    allow_unsafe_method: bool = False,
+    retryable_statuses: Collection[int] | None = None,
+) -> None
+```
+
+Raises `RetryableHTTPStatus` when `should_retry_http` is true for that status.
+Otherwise it returns `None`. A 404 is not turned into a success or a failure
+by this function.
+
+### retry_http
+
+```python
+retry_http(
+    *,
+    method: str,
+    policy: RetryPolicy | None = None,
+    allow_unsafe_method: bool = False,
+    retryable_statuses: Collection[int] | None = None,
+    retry_on: tuple[type[Exception], ...] = DEFAULT_RETRYABLE_HTTP_EXCEPTIONS,
+    sleep: Callable[[float], Any] | None = None,
+    random_value: Callable[[], float] = random.random,
+) -> Callable[[F], F]
+```
+
+Uses the existing `retry` decorator and `RetryPolicy`. There is no second
+backoff implementation and no timeout argument. `allow_unsafe_method` here
+applies only to transport exceptions caught by the decorator. Status checks
+inside the function use the flag passed to `raise_for_retryable_status`.
+
+When a transport exception is eligible, the decorator raises
+`RetryableHTTPStatus` with `error_type` set to the exception class name. The
+message does not copy the original text. After the last attempt, that signal
+is re-raised. `BaseException` values that are not in `retry_on` propagate on
+the first occurrence.
+
+```python
+from pyforge import RetryPolicy, raise_for_retryable_status, retry_http
+
+
+@retry_http(method="GET", policy=RetryPolicy(max_attempts=3))
+def fetch(url: str) -> int:
+    response = client.get(url, timeout=2.0)
+    raise_for_retryable_status("GET", response.status_code)
+    return response.status_code
+
+
+@retry_http(method="POST", allow_unsafe_method=True, policy=RetryPolicy(max_attempts=2))
+def create(url: str, body: bytes, idempotency_key: str) -> int:
+    response = client.post(
+        url,
+        data=body,
+        timeout=2.0,
+        headers={"Idempotency-Key": idempotency_key},
+    )
+    raise_for_retryable_status("POST", response.status_code, allow_unsafe_method=True)
+    return response.status_code
+```
+
+`client` is the caller's HTTP library. The `timeout` arguments above belong to
+that library. The idempotency key is also the caller's. PyForge does not send
+either one.
+
+### RetryableHTTPStatus
+
+```python
+RetryableHTTPStatus(
+    method: str,
+    *,
+    status_code: int | None = None,
+    error_type: str | None = None,
+)
+```
+
+Provide exactly one of `status_code` or `error_type`. `error_type` must be an
+identifier, such as `TimeoutError`. The exception attributes are `method`,
+`status_code`, and `error_type`.

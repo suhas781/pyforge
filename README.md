@@ -2,11 +2,11 @@
 
 **A production-minded Python engineering toolkit.**
 
-PyForge is a small, typed Python package for reusable engineering primitives. The current code covers bounded retries, JSON logging, and environment-backed configuration. HTTP examples are a later milestone and are not implemented.
+PyForge is a small, typed Python package for reusable engineering primitives. The current code covers bounded retries, JSON logging, environment-backed configuration, and HTTP retry decisions. It does not include an HTTP client.
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: Milestone 3 environment configuration is implemented. Local checks ran on Python 3.11, and the GitHub Actions run for this branch reported success on Python 3.11, 3.12, and 3.13. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, or pydantic-settings.
+> Status: Milestone 4 HTTP retry decisions are implemented. Local checks ran on Python 3.11, and the GitHub Actions run for this branch reported success on Python 3.11, 3.12, and 3.13. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, or an HTTP client.
 
 ## Why PyForge exists
 
@@ -21,11 +21,12 @@ AI and backend systems are only as reliable as the code around them. PyForge sta
 - Injectable sleep and random functions so tests do not wait on real time
 - `JsonFormatter` and `get_logger` for one JSON object per record, without configuring the root logger
 - `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float` read one variable per call, with explicit defaults, required values, and numeric bounds
+- `retry_http` and `should_retry_http` classify idempotent methods and retryable HTTP statuses, then reuse `RetryPolicy`
 - Standard-library-only runtime
 
 ## Safety
 
-Retrying a call can repeat its side effects. Retry a remote write only when the operation is idempotent or the request carries an idempotency key. PyForge does not decide that for you. See [Security notes](docs/security.md). The parameter and exception details are in the [API reference](docs/api-reference.md).
+Retrying a call can repeat its side effects. `retry_http` retries idempotent methods only, unless `allow_unsafe_method=True`. That flag means the caller already has an idempotency key or an equivalent server guarantee. PyForge does not create the key, and it does not promise exactly-once execution. A client timeout does not prove the server skipped the request. See [Security notes](docs/security.md). The parameter and exception details are in the [API reference](docs/api-reference.md).
 
 `retry_on` defaults to `(Exception,)`, which includes ordinary failures such as `ValueError` and `RuntimeError`. Pass a narrow tuple. `KeyboardInterrupt`, `SystemExit`, `GeneratorExit`, and `asyncio.CancelledError` are not caught.
 
@@ -75,6 +76,19 @@ port = get_env_int("PORT", default=8000, minimum=1, maximum=65535)
 
 `get_env` returns the stored string. `DEBUG` accepts `true`, `1`, `yes`, `on`, `false`, `0`, `no`, and `off`. These functions do not load a `.env` file.
 
+```python
+from pyforge import RetryPolicy, raise_for_retryable_status, retry_http
+
+
+@retry_http(method="GET", policy=RetryPolicy(max_attempts=3))
+def fetch(url: str) -> int:
+    response = client.get(url, timeout=2.0)
+    raise_for_retryable_status("GET", response.status_code)
+    return response.status_code
+```
+
+`client` and `timeout` belong to the caller's HTTP library. `POST` is not retried unless both the decorator and `raise_for_retryable_status` receive `allow_unsafe_method=True`, and the caller has already attached an idempotency key.
+
 ## Design principles
 
 1. Explicit behavior: retries are bounded and exception-aware.
@@ -90,12 +104,14 @@ pyforge/
 ├── src/pyforge/
 │   ├── __init__.py
 │   ├── config.py
+│   ├── http.py
 │   ├── logging.py
 │   ├── py.typed
 │   └── retry.py
 ├── tests/test_retry.py
 ├── tests/test_logging.py
 ├── tests/test_config.py
+├── tests/test_http.py
 ├── docs/
 │   ├── architecture.md
 │   ├── api-reference.md
@@ -103,7 +119,8 @@ pyforge/
 │   └── decisions/
 │       ├── 0001-retry-policy.md
 │       ├── 0002-structured-logging.md
-│       └── 0003-environment-configuration.md
+│       ├── 0003-environment-configuration.md
+│       └── 0004-http-resilience.md
 ├── scripts/check_distribution.py
 ├── .github/workflows/ci.yml
 ├── pyproject.toml
@@ -134,7 +151,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - [x] Milestone 5: API reference, security notes, changelog, and distribution validation
 - [x] Milestone 2: structured JSON logging
 - [x] Milestone 3: environment-backed configuration helpers
-- [ ] Milestone 4: optional HTTP resilience example
+- [x] Milestone 4: HTTP retry decisions on top of the retry engine
 - [ ] Milestone 6: tagged release after owner approval
 
 ## Limitations
@@ -142,7 +159,8 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - No distributed coordination, persistent retry state, circuit breaker, or rate limiter.
 - Jitter is a symmetric fraction around the capped backoff. It cannot extend a delay past `max_delay`, so the interval is not symmetric once the cap is hit.
 - Async sleep must be awaitable. Injecting a blocking sleep function would block the event loop.
-- HTTP retries are not implemented. Configuration readers do not load `.env` files or cache values.
+- There is no HTTP client and no socket timeout in PyForge. Configuration readers do not load `.env` files or cache values.
+- HTTP retries are not exactly-once. `POST` and `PATCH` are retried only when the caller opts in. A client timeout does not show whether the server processed the request.
 - Log redaction covers only the field names, suffixes, and text patterns in `docs/security.md`. A value that does not match those rules is not detected. Configuration functions return secrets as stored and only keep them out of error messages.
 - No benchmark numbers are published.
 - Python 3.12 and 3.13 were not run locally. The GitHub Actions run for this branch reported success on 3.11, 3.12, and 3.13.
