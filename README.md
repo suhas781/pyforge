@@ -6,7 +6,7 @@ PyForge is a small, typed Python package for reusable engineering primitives. Th
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: Milestone 2 structured logging is in the working tree. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity or structlog.
+> Status: Milestone 2 structured logging is implemented and verified locally on Python 3.11. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity or structlog. Hosted CI for this branch has not been observed yet.
 
 ## Why PyForge exists
 
