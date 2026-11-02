@@ -15,6 +15,20 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 EXPECTED_NAME = "pyforge-toolkit"
 EXPECTED_VERSION = "0.1.0"
+EXPECTED_WHEEL = "pyforge_toolkit-0.1.0-py3-none-any.whl"
+EXPECTED_SDIST = "pyforge_toolkit-0.1.0.tar.gz"
+EXPECTED_URLS = {
+    "Changelog": "https://github.com/suhas781/pyforge/blob/main/CHANGELOG.md",
+    "Documentation": "https://github.com/suhas781/pyforge/blob/main/docs/api-reference.md",
+    "Homepage": "https://github.com/suhas781/pyforge",
+    "Repository": "https://github.com/suhas781/pyforge",
+}
+EXPECTED_CLASSIFIERS = (
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+)
 WHEEL_FILES = (
     "pyforge/__init__.py",
     "pyforge/cache.py",
@@ -48,6 +62,10 @@ def main() -> None:
     sdists = sorted(DIST.glob("*.tar.gz"))
     if len(wheels) != 1 or len(sdists) != 1:
         raise SystemExit(f"Expected one wheel and one sdist in {DIST}, found {wheels=} {sdists=}")
+    if wheels[0].name != EXPECTED_WHEEL:
+        raise SystemExit(f"Unexpected wheel name: {wheels[0].name}")
+    if sdists[0].name != EXPECTED_SDIST:
+        raise SystemExit(f"Unexpected sdist name: {sdists[0].name}")
     _check_wheel(wheels[0])
     _check_sdist(sdists[0])
     print(f"Validated {wheels[0].name} and {sdists[0].name}")
@@ -66,6 +84,8 @@ def _check_wheel(path: Path) -> None:
             raise SystemExit(f"{path.name} is missing the license")
         metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
         _check_metadata(archive.read(metadata_name).decode("utf-8"))
+        wheel_name = next(name for name in names if name.endswith(".dist-info/WHEEL"))
+        _check_wheel_tags(archive.read(wheel_name).decode("utf-8"))
 
 
 def _check_sdist(path: Path) -> None:
@@ -80,23 +100,57 @@ def _check_sdist(path: Path) -> None:
 
 
 def _check_metadata(metadata: str) -> None:
-    fields: dict[str, str] = {}
-    runtime_requirements: list[str] = []
+    fields: dict[str, list[str]] = {}
     for line in metadata.splitlines():
         if not line or line.startswith((" ", "\t")) or ": " not in line:
             continue
         key, value = line.split(": ", 1)
-        fields.setdefault(key, value)
-        if key == "Requires-Dist" and "extra ==" not in value:
-            runtime_requirements.append(value)
-    if fields.get("Name") != EXPECTED_NAME:
-        raise SystemExit(f"Unexpected distribution name: {fields.get('Name')}")
-    if fields.get("Version") != EXPECTED_VERSION:
-        raise SystemExit(f"Unexpected version: {fields.get('Version')}")
-    if fields.get("Requires-Python") != ">=3.11":
-        raise SystemExit(f"Unexpected Requires-Python: {fields.get('Requires-Python')}")
+        fields.setdefault(key, []).append(value)
+    name = _one(fields, "Name")
+    version = _one(fields, "Version")
+    requires_python = _one(fields, "Requires-Python")
+    if name != EXPECTED_NAME:
+        raise SystemExit(f"Unexpected distribution name: {name}")
+    if version != EXPECTED_VERSION:
+        raise SystemExit(f"Unexpected version: {version}")
+    if requires_python != ">=3.11":
+        raise SystemExit(f"Unexpected Requires-Python: {requires_python}")
+    license_values = fields.get("License-Expression", [])
+    if license_values != ["MIT"]:
+        raise SystemExit(f"Unexpected license expression: {license_values}")
+    runtime_requirements = [
+        value for value in fields.get("Requires-Dist", []) if "extra ==" not in value
+    ]
     if runtime_requirements:
         raise SystemExit(f"Runtime dependencies are not allowed: {runtime_requirements}")
+    urls: dict[str, str] = {}
+    for value in fields.get("Project-URL", []):
+        label, _, url = value.partition(", ")
+        urls[label] = url
+    if urls != EXPECTED_URLS:
+        raise SystemExit(f"Unexpected project URLs: {urls}")
+    classifiers = set(fields.get("Classifier", []))
+    missing = [item for item in EXPECTED_CLASSIFIERS if item not in classifiers]
+    if missing:
+        raise SystemExit(f"Metadata is missing classifiers: {missing}")
+
+
+def _check_wheel_tags(wheel_text: str) -> None:
+    tags = [line.split(": ", 1)[1] for line in wheel_text.splitlines() if line.startswith("Tag: ")]
+    pure = [
+        line.split(": ", 1)[1]
+        for line in wheel_text.splitlines()
+        if line.startswith("Root-Is-Purelib: ")
+    ]
+    if tags != ["py3-none-any"] or pure != ["true"]:
+        raise SystemExit(f"Unexpected wheel tags: {tags=} {pure=}")
+
+
+def _one(fields: dict[str, list[str]], key: str) -> str:
+    values = fields.get(key, [])
+    if len(values) != 1:
+        raise SystemExit(f"Expected one {key} field, found {values}")
+    return values[0]
 
 
 def _reject_sensitive_paths(label: str, names: list[str]) -> None:

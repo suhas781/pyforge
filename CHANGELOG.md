@@ -7,6 +7,9 @@ has been published, and this project has not been uploaded to PyPI.
 
 ### Added
 
+- Release checklist in `docs/releasing.md`. Project metadata now records the
+  repository URLs. The license stays the `MIT` expression, and CI still does
+  not tag or publish. Version remains `0.1.0`.
 - `pyforge.testing` with `FakeClock`, `RecordingSleeper`,
   `AsyncRecordingSleeper`, `CallCount`, `FailThenReturn`, `ClockedCache`, and
   `temporary_env`. Importing `pyforge` does not load these helpers. They do

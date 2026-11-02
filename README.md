@@ -6,7 +6,7 @@ PyForge is a small, typed Python package for reusable engineering primitives. Th
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: Deterministic test helpers are implemented. Local checks ran on Python 3.11, and the GitHub Actions run for this branch reported success on Python 3.11, 3.12, and 3.13. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, cachetools, pytest, or an HTTP client.
+> Status: Release readiness is documented for version `0.1.0`. The package is not tagged and is not on PyPI. Local checks ran on Python 3.11, and the GitHub Actions run for this branch reported success on Python 3.11, 3.12, and 3.13. This is an alpha library, not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, cachetools, pytest, or an HTTP client.
 
 ## Why PyForge exists
 
@@ -35,7 +35,9 @@ Retrying a call can repeat its side effects. `retry_http` retries idempotent met
 
 Importing `pyforge` does not configure the root logger, read environment variables, or make network calls. JSON logging redacts only the names, suffixes, and text patterns in [Security notes](docs/security.md). Configuration errors omit the stored value; the returned value itself is not redacted.
 
-## Quick start
+## Installation
+
+PyForge is not on PyPI. There is no Git tag and no GitHub release. Install it from a checkout:
 
 ```bash
 git clone https://github.com/suhas781/pyforge.git
@@ -44,10 +46,11 @@ python -m venv .venv
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 # macOS/Linux: source .venv/bin/activate
 python -m pip install -e ".[dev]"
-pytest
 ```
 
-## Example
+The distribution name is `pyforge-toolkit`. The import name is `pyforge`. Python 3.11 or newer is required. Application code has no runtime dependencies. The `dev` extra installs the test and packaging tools.
+
+## Examples
 
 ```python
 from pyforge import RetryPolicy, retry
@@ -70,11 +73,29 @@ def fetch_remote_data() -> dict[str, str]:
 `max_attempts` includes the first call. After the last matching failure, the original exception is raised with its type and message unchanged. Tests should inject `sleep` and `random_value` instead of waiting on `time.sleep` or `asyncio.sleep`.
 
 ```python
-from pyforge import get_env, get_env_bool, get_env_int
+import logging
+
+from pyforge import JsonFormatter, LogContext, get_logger
+
+handler = logging.StreamHandler()
+handler.setFormatter(JsonFormatter())
+logger = logging.getLogger("billing")
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
+billing = get_logger("billing", context=LogContext(operation="charge"))
+billing.info("charged", extra={"attempt": 1})
+```
+
+`get_logger` does not attach a handler or change the root logger. `JsonFormatter` writes one JSON object. Redaction covers only the names, suffixes, and text patterns in the security notes.
+
+```python
+from pyforge import get_env, get_env_bool, get_env_float, get_env_int
 
 database_url = get_env("DATABASE_URL", required=True)
 debug = get_env_bool("DEBUG", default=False)
 port = get_env_int("PORT", default=8000, minimum=1, maximum=65535)
+timeout = get_env_float("TIMEOUT_SECONDS", default=2.0, minimum=0.0)
 ```
 
 `get_env` returns the stored string. `DEBUG` accepts `true`, `1`, `yes`, `on`, `false`, `0`, `no`, and `off`. These functions do not load a `.env` file.
@@ -91,6 +112,21 @@ def fetch(url: str) -> int:
 ```
 
 `client` and `timeout` belong to the caller's HTTP library. `POST` is not retried unless both the decorator and `raise_for_retryable_status` receive `allow_unsafe_method=True`, and the caller has already attached an idempotency key.
+
+```python
+from pyforge import RetryEvent, RetryPolicy, retry
+
+
+def observe(event: RetryEvent) -> None:
+    print(event.event_type.value, event.attempt, event.exception_type)
+
+
+@retry(policy=RetryPolicy(max_attempts=3), retry_on=(TimeoutError,), observer=observe)
+def load() -> str:
+    return "ok"
+```
+
+A first successful attempt emits no event. Later events carry the exception class name, not the message. PyForge does not install a metrics backend.
 
 ```python
 from pyforge import MemoryCache
@@ -115,16 +151,37 @@ calls = FailThenReturn(2, "ok")
     retry_on=(TimeoutError,),
     sleep=sleeper,
 )
-def fetch() -> str:
+def fetch_saved() -> str:
     return calls()
 
 
-assert fetch() == "ok"
+assert fetch_saved() == "ok"
 assert calls.count == 3
 assert sleeper.delays == (0.25, 0.5)
 ```
 
 `RecordingSleeper` does not sleep. `FailThenReturn` raises `TimeoutError` twice, then returns `"ok"`. Import these helpers from `pyforge.testing`. Importing `pyforge` does not load them.
+
+Parameter details are in the [API reference](docs/api-reference.md). Design notes are in [Architecture](docs/architecture.md).
+
+## Testing
+
+```bash
+ruff check .
+ruff format --check .
+mypy src
+pytest --cov=pyforge --cov-report=term-missing
+python -m build
+python scripts/check_distribution.py
+```
+
+The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the `build` frontend. Coverage is configured to fail under 90% for the `pyforge` package. `build` produces installable artifacts; the library does not import it.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Pull requests should include tests for new behavior, keep the public API typed, and avoid runtime dependencies. Do not commit `dist/`, virtual environments, or `.env` files.
+
+A release is a separate decision. The steps are in [docs/releasing.md](docs/releasing.md). Merging to `main` runs tests and packaging checks. It does not publish the package.
 
 ## Design principles
 
@@ -158,6 +215,7 @@ pyforge/
 ├── docs/
 │   ├── architecture.md
 │   ├── api-reference.md
+│   ├── releasing.md
 │   ├── security.md
 │   └── decisions/
 │       ├── 0001-retry-policy.md
@@ -166,7 +224,8 @@ pyforge/
 │       ├── 0004-http-resilience.md
 │       ├── 0005-retry-observability.md
 │       ├── 0006-in-memory-cache.md
-│       └── 0007-testing-utilities.md
+│       ├── 0007-testing-utilities.md
+│       └── 0008-release-readiness.md
 ├── scripts/check_distribution.py
 ├── .github/workflows/ci.yml
 ├── pyproject.toml
@@ -175,19 +234,6 @@ pyforge/
 ├── LICENSE
 └── README.md
 ```
-
-## Development commands
-
-```bash
-ruff check .
-ruff format --check .
-mypy src
-pytest --cov=pyforge --cov-report=term-missing
-python -m build
-python scripts/check_distribution.py
-```
-
-The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the `build` frontend. Coverage is configured to fail under 90% for the `pyforge` package. `build` produces installable artifacts; the library does not import it.
 
 ## Roadmap
 
@@ -201,6 +247,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - [x] Retry observability callbacks for scheduled, succeeded, and exhausted attempts
 - [x] In-memory cache with TTL, LRU eviction, and an injected monotonic clock
 - [x] Test helpers for a fake clock, recorded sleep, scripted calls, and temporary environment values
+- [x] Release checklist and packaging metadata review, without a tag or PyPI upload
 - [ ] Milestone 6: tagged release after owner approval
 
 ## Limitations
@@ -215,7 +262,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - `MemoryCache` bounds the number of entries, not their size. It does not persist, encrypt, or share entries across processes. A restart drops the cache. Key hashing and equality run while the instance lock is held.
 - `pyforge.testing` is for tests. `temporary_env` changes the process environment for the names it is given, and those names are visible to every thread until the block exits. The helpers do not patch `time.sleep` or `asyncio.sleep`.
 - No benchmark numbers are published.
-- Python 3.12 and 3.13 were not run locally. The GitHub Actions run for this branch reported success on 3.11, 3.12, and 3.13.
+- Python 3.12 and 3.13 were not run locally. The GitHub Actions run for this branch reported success on 3.11, 3.12, and 3.13. CI does not publish the package.
 
 ## License
 

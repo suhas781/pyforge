@@ -15,12 +15,19 @@ keywords = ["python", "engineering", "retry", "resilience", "toolkit"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Typing :: Typed",
 ]
+
+[project.urls]
+Homepage = "https://github.com/suhas781/pyforge"
+Repository = "https://github.com/suhas781/pyforge"
+Documentation = "https://github.com/suhas781/pyforge/blob/main/docs/api-reference.md"
+Changelog = "https://github.com/suhas781/pyforge/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [

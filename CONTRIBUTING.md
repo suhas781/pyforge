@@ -32,3 +32,6 @@ Do not commit `dist/`, `build/`, virtual environments, `.coverage`, or `.env` fi
 - Update architecture documentation or add an ADR when changing design.
 - Never commit credentials, tokens, local environment files, or private data.
 - Keep pull requests focused and explain trade-offs.
+
+A tagged release or PyPI upload is not part of a feature pull request. The
+checklist is `docs/releasing.md`.
