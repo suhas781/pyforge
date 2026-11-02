@@ -2,11 +2,11 @@
 
 **A production-minded Python engineering toolkit.**
 
-PyForge is a small, typed Python package for reusable engineering primitives. The current code covers bounded retries, JSON logging, environment-backed configuration, and HTTP retry decisions. It does not include an HTTP client.
+PyForge is a small, typed Python package for reusable engineering primitives. The current code covers bounded retries, JSON logging, environment-backed configuration, HTTP retry decisions, and optional retry events. It does not include an HTTP client or a metrics backend.
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: Milestone 4 HTTP retry decisions are implemented. Local checks ran on Python 3.11, and the GitHub Actions run for this branch reported success on Python 3.11, 3.12, and 3.13. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, or an HTTP client.
+> Status: Retry observability is implemented and verified locally on Python 3.11. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, or an HTTP client. Hosted CI for this branch has not been observed yet.
 
 ## Why PyForge exists
 
@@ -22,6 +22,7 @@ AI and backend systems are only as reliable as the code around them. PyForge sta
 - `JsonFormatter` and `get_logger` for one JSON object per record, without configuring the root logger
 - `get_env`, `get_env_bool`, `get_env_int`, and `get_env_float` read one variable per call, with explicit defaults, required values, and numeric bounds
 - `retry_http` and `should_retry_http` classify idempotent methods and retryable HTTP statuses, then reuse `RetryPolicy`
+- `RetryEvent` callbacks report scheduled retries, later success, and exhausted attempts without a metrics library
 - Standard-library-only runtime
 
 ## Safety
@@ -106,12 +107,14 @@ pyforge/
 │   ├── config.py
 │   ├── http.py
 │   ├── logging.py
+│   ├── observe.py
 │   ├── py.typed
 │   └── retry.py
 ├── tests/test_retry.py
 ├── tests/test_logging.py
 ├── tests/test_config.py
 ├── tests/test_http.py
+├── tests/test_observe.py
 ├── docs/
 │   ├── architecture.md
 │   ├── api-reference.md
@@ -120,7 +123,8 @@ pyforge/
 │       ├── 0001-retry-policy.md
 │       ├── 0002-structured-logging.md
 │       ├── 0003-environment-configuration.md
-│       └── 0004-http-resilience.md
+│       ├── 0004-http-resilience.md
+│       └── 0005-retry-observability.md
 ├── scripts/check_distribution.py
 ├── .github/workflows/ci.yml
 ├── pyproject.toml
@@ -152,6 +156,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - [x] Milestone 2: structured JSON logging
 - [x] Milestone 3: environment-backed configuration helpers
 - [x] Milestone 4: HTTP retry decisions on top of the retry engine
+- [x] Retry observability callbacks for scheduled, succeeded, and exhausted attempts
 - [ ] Milestone 6: tagged release after owner approval
 
 ## Limitations
@@ -162,8 +167,9 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - There is no HTTP client and no socket timeout in PyForge. Configuration readers do not load `.env` files or cache values.
 - HTTP retries are not exactly-once. `POST` and `PATCH` are retried only when the caller opts in. A client timeout does not show whether the server processed the request.
 - Log redaction covers only the field names, suffixes, and text patterns in `docs/security.md`. A value that does not match those rules is not detected. Configuration functions return secrets as stored and only keep them out of error messages.
+- Retry events carry the exception class name, not the message. PyForge does not ship a metrics backend or distributed tracer. An ordinary observer exception is discarded.
 - No benchmark numbers are published.
-- Python 3.12 and 3.13 were not run locally. The GitHub Actions run for this branch reported success on 3.11, 3.12, and 3.13.
+- Python 3.12 and 3.13 were not run locally. Hosted CI for this observability branch has not been observed yet.
 
 ## License
 

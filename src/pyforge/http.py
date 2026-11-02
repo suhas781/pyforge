@@ -20,6 +20,7 @@ import re
 from collections.abc import Awaitable, Callable, Collection
 from typing import Any, TypeVar, cast
 
+from pyforge.observe import RetryObserver
 from pyforge.retry import RetryPolicy, retry
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -146,6 +147,7 @@ def retry_http(
     retry_on: tuple[type[Exception], ...] = DEFAULT_RETRYABLE_HTTP_EXCEPTIONS,
     sleep: Callable[[float], Any] | None = None,
     random_value: Random = random.random,
+    observer: RetryObserver | None = None,
 ) -> Callable[[F], F]:
     """Retry a callable with ``RetryPolicy`` when the HTTP outcome is eligible.
 
@@ -161,6 +163,12 @@ def retry_http(
 
     This decorator does not accept a timeout. Set the timeout on the HTTP
     client that performs the request. There is no exactly-once guarantee.
+
+    ``observer`` is forwarded to ``retry`` once. ``retry_http`` does not emit
+    a second event. Lifecycle events name ``RetryableHTTPStatus`` because
+    transport errors are translated before the retry loop. They do not include
+    the response body, headers, or the original exception message. Use
+    ``should_retry_http`` for the retry decision; it does not emit events.
     """
     checked_method = _method_name(method)
     opted_in = _flag("allow_unsafe_method", allow_unsafe_method)
@@ -171,6 +179,7 @@ def retry_http(
         retry_on=(RetryableHTTPStatus,),
         sleep=sleep,
         random_value=random_value,
+        observer=observer,
     )
 
     def decorator(function: F) -> F:

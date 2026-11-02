@@ -72,6 +72,7 @@ retry(
     retry_on: tuple[type[Exception], ...] = (Exception,),
     sleep: Callable[[float], Any] | None = None,
     random_value: Callable[[], float] = random.random,
+    observer: RetryObserver | None = None,
 ) -> Callable[[F], F]
 ```
 
@@ -99,6 +100,14 @@ that injected callable must be awaitable. `random_value` is called once per
 retry delay and must return a number in `[0, 1]`. An invalid draw raises
 `ValueError` before sleep; the original operation exception remains the
 context of that `ValueError`.
+
+`observer`, when passed, is a synchronous callable taking one `RetryEvent`.
+It runs before sleep for `scheduled`, after a later attempt returns for
+`succeeded`, and before the original exception is re-raised for `exhausted`.
+A first-attempt success does not call it. An `Exception` from the observer is
+discarded. `BaseException` from the observer propagates. A non-callable
+observer raises `TypeError` when the decorator is created. There is no global
+observer.
 
 `functools.wraps` preserves `__name__`, `__qualname__`, `__doc__`, `__module__`,
 `__annotations__`, and `__wrapped__`.
@@ -404,6 +413,7 @@ retry_http(
     retry_on: tuple[type[Exception], ...] = DEFAULT_RETRYABLE_HTTP_EXCEPTIONS,
     sleep: Callable[[float], Any] | None = None,
     random_value: Callable[[], float] = random.random,
+    observer: RetryObserver | None = None,
 ) -> Callable[[F], F]
 ```
 
@@ -411,6 +421,11 @@ Uses the existing `retry` decorator and `RetryPolicy`. There is no second
 backoff implementation and no timeout argument. `allow_unsafe_method` here
 applies only to transport exceptions caught by the decorator. Status checks
 inside the function use the flag passed to `raise_for_retryable_status`.
+
+`observer` is passed through to `retry` once. `retry_http` does not emit a
+second event. Those events use `exception_type="RetryableHTTPStatus"` because
+the transport error is translated before the retry loop. `should_retry_http`
+does not emit events; it only answers the decision.
 
 When a transport exception is eligible, the decorator raises
 `RetryableHTTPStatus` with `error_type` set to the exception class name. The
@@ -459,3 +474,60 @@ RetryableHTTPStatus(
 Provide exactly one of `status_code` or `error_type`. `error_type` must be an
 identifier, such as `TimeoutError`. The exception attributes are `method`,
 `status_code`, and `error_type`.
+
+## RetryEvent
+
+```python
+class RetryEventType(StrEnum):
+    SCHEDULED = "scheduled"
+    SUCCEEDED = "succeeded"
+    EXHAUSTED = "exhausted"
+
+
+RetryEvent(
+    event_type: RetryEventType,
+    attempt: int,
+    max_attempts: int,
+    delay: float | None = None,
+    exception_type: str | None = None,
+)
+```
+
+`RetryObserver` is `Callable[[RetryEvent], object]`. The return value is
+ignored.
+
+| `event_type` | When | `attempt` | `delay` | `exception_type` |
+| --- | --- | --- | --- | --- |
+| `scheduled` | A matching failure will be retried | The attempt that failed, and less than `max_attempts` | Seconds about to be passed to sleep | Exception class name |
+| `succeeded` | A later attempt returned | The successful attempt, at least 2 | `None` | `None` |
+| `exhausted` | The final attempt failed | Equal to `max_attempts` | `None` | Exception class name |
+
+The class name is `type(exc).__name__`. The message is not copied. Invalid
+combinations raise `ValueError` or `TypeError` when the event is constructed.
+
+```python
+from pyforge import JsonFormatter, RetryEvent, RetryPolicy, get_logger, retry
+
+counts = {"scheduled": 0, "succeeded": 0, "exhausted": 0}
+logger = get_logger("billing")
+
+
+def observe(event: RetryEvent) -> None:
+    counts[event.event_type.value] += 1
+    logger.info(
+        "retry %s %s",
+        event.event_type.value,
+        event.exception_type or "-",
+        extra={"operation": "charge", "attempt": event.attempt},
+    )
+
+
+@retry(policy=RetryPolicy(max_attempts=3), retry_on=(TimeoutError,), observer=observe)
+def fetch(url: str) -> str:
+    return client.get(url, timeout=2.0).text
+```
+
+`counts` is ordinary application state. `JsonFormatter` can format the log
+record, and it still applies only the redaction rules in the security notes.
+PyForge does not install a handler, a metrics exporter, or a tracer. The
+`client` and its timeout belong to the caller.

@@ -15,6 +15,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, TypeVar, cast
 
+from pyforge.observe import RetryEvent, RetryEventType, RetryObserver, notify_retry
+
 F = TypeVar("F", bound=Callable[..., Any])
 Random = Callable[[], float]
 
@@ -126,6 +128,7 @@ def retry(
     retry_on: tuple[type[Exception], ...] = (Exception,),
     sleep: Callable[[float], Any] | None = None,
     random_value: Random = random.random,
+    observer: RetryObserver | None = None,
 ) -> Callable[[F], F]:
     """Decorate a synchronous or asynchronous callable with bounded retries.
 
@@ -144,6 +147,12 @@ def retry(
     awaitable. ``random_value`` is called once for each delay and must return
     a number in ``[0, 1]``.
 
+    ``observer`` receives a ``RetryEvent`` when a retry is scheduled, when a
+    later attempt succeeds, and when attempts are exhausted. A first-attempt
+    success emits nothing. The observer is synchronous. An ``Exception`` from
+    the observer is discarded. ``BaseException`` propagates. The event carries
+    the exception class name, not the message.
+
     Example:
         @retry(policy=RetryPolicy(max_attempts=3), retry_on=(TimeoutError,))
         def fetch() -> str:
@@ -151,6 +160,45 @@ def retry(
     """
     selected_policy = policy or RetryPolicy()
     _validate_retry_on(retry_on)
+    if observer is not None and not callable(observer):
+        raise TypeError("observer must be callable")
+
+    def notify_failure(attempt: int, exc: Exception) -> float | None:
+        if attempt >= selected_policy.max_attempts:
+            notify_retry(
+                observer,
+                RetryEvent(
+                    RetryEventType.EXHAUSTED,
+                    attempt,
+                    selected_policy.max_attempts,
+                    exception_type=type(exc).__name__,
+                ),
+            )
+            return None
+        delay = selected_policy.delay_for(attempt, random_value())
+        notify_retry(
+            observer,
+            RetryEvent(
+                RetryEventType.SCHEDULED,
+                attempt,
+                selected_policy.max_attempts,
+                delay,
+                type(exc).__name__,
+            ),
+        )
+        return delay
+
+    def notify_success(attempt: int) -> None:
+        if attempt == 1:
+            return
+        notify_retry(
+            observer,
+            RetryEvent(
+                RetryEventType.SUCCEEDED,
+                attempt,
+                selected_policy.max_attempts,
+            ),
+        )
 
     def decorator(function: F) -> F:
         if asyncio.iscoroutinefunction(function):
@@ -162,12 +210,16 @@ def retry(
                 attempt = 1
                 while True:
                     try:
-                        return await async_function(*args, **kwargs)
-                    except retry_on:
-                        if attempt >= selected_policy.max_attempts:
+                        result = await async_function(*args, **kwargs)
+                    except retry_on as exc:
+                        delay = notify_failure(attempt, exc)
+                        if delay is None:
                             raise
-                        await async_sleep(selected_policy.delay_for(attempt, random_value()))
+                        await async_sleep(delay)
                         attempt += 1
+                        continue
+                    notify_success(attempt)
+                    return result
 
             return cast(F, async_wrapper)
 
@@ -178,12 +230,16 @@ def retry(
             attempt = 1
             while True:
                 try:
-                    return function(*args, **kwargs)
-                except retry_on:
-                    if attempt >= selected_policy.max_attempts:
+                    result = function(*args, **kwargs)
+                except retry_on as exc:
+                    delay = notify_failure(attempt, exc)
+                    if delay is None:
                         raise
-                    sync_sleep(selected_policy.delay_for(attempt, random_value()))
+                    sync_sleep(delay)
                     attempt += 1
+                    continue
+                notify_success(attempt)
+                return result
 
         return cast(F, sync_wrapper)
 

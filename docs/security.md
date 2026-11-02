@@ -23,6 +23,20 @@ A client timeout is not evidence that the server did nothing. Retrying after
 a timeout can apply the same POST twice when no idempotency guarantee exists.
 Nothing in this package provides exactly-once execution.
 
+## Retry events
+
+`RetryEvent` records the event type, attempt, maximum attempts, delay, and
+exception class name. It does not store the exception object, the exception
+message, response bodies, or headers. `retry_http` events therefore name
+`RetryableHTTPStatus` rather than copying a transport error that might contain
+a URL or credential.
+
+An `Exception` raised by an observer is discarded. That keeps a metrics
+callback from hiding the application's timeout or returning a failure after
+the operation succeeded. The discarded exception is not logged. `BaseException`
+from the observer still propagates. PyForge does not connect these events to
+a metrics backend or a tracer.
+
 ## Exception and cancellation boundaries
 
 The wrapper catches only the configured `Exception` subclasses. It does not
