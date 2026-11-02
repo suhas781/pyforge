@@ -6,7 +6,7 @@ PyForge is a small, typed Python package for reusable engineering primitives. Th
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: Deterministic test helpers are implemented. Local checks ran on Python 3.11. Hosted CI for this branch has not been observed yet. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, cachetools, pytest, or an HTTP client.
+> Status: Deterministic test helpers are implemented. Local checks ran on Python 3.11, and the GitHub Actions run for this branch reported success on Python 3.11, 3.12, and 3.13. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, cachetools, pytest, or an HTTP client.
 
 ## Why PyForge exists
 
@@ -215,7 +215,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - `MemoryCache` bounds the number of entries, not their size. It does not persist, encrypt, or share entries across processes. A restart drops the cache. Key hashing and equality run while the instance lock is held.
 - `pyforge.testing` is for tests. `temporary_env` changes the process environment for the names it is given, and those names are visible to every thread until the block exits. The helpers do not patch `time.sleep` or `asyncio.sleep`.
 - No benchmark numbers are published.
-- Python 3.12 and 3.13 were not run locally. Hosted CI for this branch has not been observed yet.
+- Python 3.12 and 3.13 were not run locally. The GitHub Actions run for this branch reported success on 3.11, 3.12, and 3.13.
 
 ## License
 
