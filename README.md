@@ -6,7 +6,7 @@ PyForge is a small, typed Python package for reusable engineering primitives. Th
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: Retry observability is implemented and verified locally on Python 3.11. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, or an HTTP client. Hosted CI for this branch has not been observed yet.
+> Status: Retry observability is implemented. Local checks ran on Python 3.11, and the GitHub Actions run for this branch reported success on Python 3.11, 3.12, and 3.13. This is an alpha library (`0.1.0`), not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, or an HTTP client.
 
 ## Why PyForge exists
 
@@ -169,7 +169,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the
 - Log redaction covers only the field names, suffixes, and text patterns in `docs/security.md`. A value that does not match those rules is not detected. Configuration functions return secrets as stored and only keep them out of error messages.
 - Retry events carry the exception class name, not the message. PyForge does not ship a metrics backend or distributed tracer. An ordinary observer exception is discarded.
 - No benchmark numbers are published.
-- Python 3.12 and 3.13 were not run locally. Hosted CI for this observability branch has not been observed yet.
+- Python 3.12 and 3.13 were not run locally. The GitHub Actions run for this branch reported success on 3.11, 3.12, and 3.13.
 
 ## License
 
