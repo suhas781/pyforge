@@ -40,10 +40,13 @@ from pyforge import (
 - `should_retry_http`, `raise_for_retryable_status`, and `retry_http`: decide
   whether an HTTP status or transport exception may be retried, then reuse
   `retry` for the attempt limit and delay.
-- `tests/test_retry.py`, `tests/test_logging.py`, `tests/test_config.py`, and
-  `tests/test_http.py`: deterministic unit tests. Retry tests inject sleep and
-  randomness. Logging tests inject records and handlers. Configuration tests
-  use `monkeypatch`. HTTP tests use fakes and do not open sockets.
+- `RetryEvent` and the optional `observer`: report scheduled retries, later
+  success, and exhausted attempts. There is no global observer.
+- `tests/test_retry.py`, `tests/test_logging.py`, `tests/test_config.py`,
+  `tests/test_http.py`, and `tests/test_observe.py`: deterministic unit tests.
+  Retry and HTTP tests inject sleep and randomness. Logging tests inject
+  records and handlers. Configuration tests use `monkeypatch`. HTTP tests use
+  fakes and do not open sockets.
 
 Tests stay in `tests/` until more than one module needs a split layout. There
 is no integration suite yet.
@@ -178,11 +181,38 @@ the client. There is no timeout parameter. The transport owns the deadline. A
 client timeout does not prove the server ignored the request, and a later
 attempt can duplicate a write.
 
+## Retry observability
+
+`retry` accepts an optional synchronous `observer`. The same callback is
+forwarded by `retry_http` into that one decorator, so a retry produces one
+set of events rather than two.
+
+The engine emits:
+
+1. `scheduled` after a matching failure when another attempt remains, before
+   sleep. `attempt` is the attempt that failed. `delay` is the value passed
+   to sleep. `exception_type` is `type(exc).__name__`.
+2. `succeeded` only when a later attempt returns. The first attempt does not
+   emit it. `delay` and `exception_type` are `None`.
+3. `exhausted` when the final matching attempt fails, before the original
+   exception is re-raised. `attempt` equals `max_attempts`. There is no delay.
+
+A non-matching exception, including cancellation, emits neither `scheduled`
+nor `exhausted`. An `Exception` from the observer is discarded after the event
+was accepted by the callback's own failure. The attempt counter and the
+application result stay unchanged. `KeyboardInterrupt`, `SystemExit`, and
+`CancelledError` from the observer propagate.
+
+HTTP lifecycle events name `RetryableHTTPStatus`. They do not repeat the
+decision made by `should_retry_http`, and they do not include response bodies,
+headers, or exception messages.
+
 ## Import side effects
 
-Importing `pyforge` imports the retry, logging, configuration, and HTTP
-decision modules. It does not configure the root logger, read environment
-variables, read `.env` files, or open a network connection.
+Importing `pyforge` imports the retry, logging, configuration, HTTP decision,
+and observability modules. It does not configure the root logger, read
+environment variables, read `.env` files, register an observer, or open a
+network connection.
 
 ## Known limitations
 
@@ -200,6 +230,8 @@ variables, read `.env` files, or open a network connection.
 - HTTP decisions do not send requests or enforce timeouts. They do not make a
   POST exactly once. A method is classified only by its name, so a GET that
   the server implements with side effects is still treated as idempotent.
+- Observers are not a metrics or tracing system. A discarded observer
+  exception is not logged, because the engine does not configure logging.
 
 ## Further documentation
 
@@ -209,3 +241,4 @@ variables, read `.env` files, or open a network connection.
 - [ADR 0002](decisions/0002-structured-logging.md) for the logging decision.
 - [ADR 0003](decisions/0003-environment-configuration.md) for the configuration decision.
 - [ADR 0004](decisions/0004-http-resilience.md) for the HTTP retry decision.
+- [ADR 0005](decisions/0005-retry-observability.md) for the observer decision.

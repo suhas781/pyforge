@@ -29,6 +29,7 @@ from pyforge.logging import (
     LogContext,
     get_logger,
 )
+from pyforge.observe import RetryEvent, RetryEventType, RetryObserver
 from pyforge.retry import RetryPolicy, retry
 
 __all__ = [
@@ -44,6 +45,9 @@ __all__ = [
     "LogContext",
     "MissingEnvironmentError",
     "OutOfRangeEnvironmentError",
+    "RetryEvent",
+    "RetryEventType",
+    "RetryObserver",
     "RetryPolicy",
     "RetryableHTTPStatus",
     "get_env",

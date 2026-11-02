@@ -7,6 +7,11 @@ has been published, and this project has not been uploaded to PyPI.
 
 ### Added
 
+- `RetryEvent`, `RetryEventType`, and an optional `observer` for `retry` and
+  `retry_http`. Events report a scheduled retry, a later success, or an
+  exhausted attempt. The first successful attempt emits nothing. Events carry
+  the exception class name, not the message. An `Exception` from the observer
+  is discarded.
 - `retry_http`, `should_retry_http`, and `raise_for_retryable_status` for HTTP
   retry decisions. They reuse `RetryPolicy` and do not send requests.
   Non-idempotent methods are not retried unless the caller opts in.
@@ -38,6 +43,7 @@ Alpha on `main`. This is the current library, not a production certification.
 
 ### Not included
 
-- An HTTP client, socket timeouts, and exactly-once request execution.
+- An HTTP client, socket timeouts, exactly-once request execution, and a
+  metrics or tracing backend.
 - A tagged release. Logging, configuration, and HTTP decisions are listed
   under Unreleased.
