@@ -23,7 +23,7 @@ AI and backend systems are only as reliable as the code around them. PyForge sta
 
 ## Safety
 
-Retrying a call can repeat its side effects. Retry a remote write only when the operation is idempotent or the request carries an idempotency key. PyForge does not decide that for you.
+Retrying a call can repeat its side effects. Retry a remote write only when the operation is idempotent or the request carries an idempotency key. PyForge does not decide that for you. See [Security notes](docs/security.md). The parameter and exception details are in the [API reference](docs/api-reference.md).
 
 `retry_on` defaults to `(Exception,)`, which includes ordinary failures such as `ValueError` and `RuntimeError`. Pass a narrow tuple. `KeyboardInterrupt`, `SystemExit`, `GeneratorExit`, and `asyncio.CancelledError` are not caught.
 
@@ -69,7 +69,7 @@ def fetch_remote_data() -> dict[str, str]:
 2. Testability: time and randomness are injectable.
 3. Small dependencies: runtime code uses the Python standard library.
 4. Typed public API: public functions and data structures are annotated.
-5. No hidden magic: retry behavior is documented in `docs/architecture.md`.
+5. No hidden magic: retry behavior is documented in `docs/architecture.md` and `docs/api-reference.md`.
 
 ## Repository structure
 
@@ -82,9 +82,13 @@ pyforge/
 ├── tests/test_retry.py
 ├── docs/
 │   ├── architecture.md
+│   ├── api-reference.md
+│   ├── security.md
 │   └── decisions/0001-retry-policy.md
+├── scripts/check_distribution.py
 ├── .github/workflows/ci.yml
 ├── pyproject.toml
+├── CHANGELOG.md
 ├── CONTRIBUTING.md
 ├── LICENSE
 └── README.md
@@ -97,21 +101,21 @@ ruff check .
 ruff format --check .
 mypy src
 pytest --cov=pyforge --cov-report=term-missing
-python -m pip install build
 python -m build
+python scripts/check_distribution.py
 ```
 
-The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, and mypy. Coverage is configured to fail under 90% for the `pyforge` package. `build` is only needed to produce an installable artifact; it is not a runtime or test dependency.
+The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the `build` frontend. Coverage is configured to fail under 90% for the `pyforge` package. `build` produces installable artifacts; the library does not import it.
 
 ## Roadmap
 
 - [x] Package skeleton, MIT license, and pyproject metadata
 - [x] Milestone 1: sync and async retry core, validation, and deterministic tests
-- [x] CI workflow for Python 3.11, 3.12, and 3.13
+- [x] CI workflow for Python 3.11, 3.12, and 3.13, including package build and artifact checks
+- [x] Milestone 5: API reference, security notes, changelog, and distribution validation
 - [ ] Milestone 2: structured logging
 - [ ] Milestone 3: environment-backed configuration helpers
 - [ ] Milestone 4: optional HTTP resilience example
-- [ ] Milestone 5: docs and CI hardening beyond the retry core
 - [ ] Milestone 6: tagged release after owner approval
 
 ## Limitations
@@ -121,6 +125,7 @@ The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, and mypy. Cov
 - Async sleep must be awaitable. Injecting a blocking sleep function would block the event loop.
 - Logging, configuration helpers, secret redaction, and HTTP retries are not implemented.
 - No benchmark numbers are published.
+- The GitHub Actions workflow defines Python 3.12 and 3.13 jobs. Those hosted runs are not treated as results unless they have actually completed.
 
 ## License
 

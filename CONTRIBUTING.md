@@ -7,7 +7,9 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
-`pytest-asyncio` is part of the `dev` extra. Async tests do not need a separate install.
+The `dev` extra includes pytest-asyncio and the `build` package. Async tests and
+package builds do not need a separate install. `build` is not a runtime
+dependency.
 
 ## Before opening a pull request
 
@@ -16,9 +18,11 @@ ruff check .
 ruff format --check .
 mypy src
 pytest --cov=pyforge --cov-report=term-missing
-python -m pip install build
 python -m build
+python scripts/check_distribution.py
 ```
+
+Do not commit `dist/`, `build/`, virtual environments, `.coverage`, or `.env` files.
 
 ## Engineering expectations
 

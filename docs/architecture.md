@@ -116,3 +116,9 @@ root logger, read environment files, or open a network connection.
   that returns a coroutine is treated as synchronous.
 - Logging redaction, configuration helpers, and HTTP retry policy are not
   implemented, so this document does not claim those controls exist.
+
+## Further documentation
+
+- [API reference](api-reference.md) for parameters, return values, and exceptions.
+- [Security notes](security.md) for idempotency, secrets, and dependencies.
+- [Changelog](../CHANGELOG.md) for the 0.1.0 alpha contents.

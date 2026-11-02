@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   quality:
-    name: Tests and static checks
+    name: Tests, types, and package
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -43,3 +43,21 @@ jobs:
 
       - name: Tests
         run: pytest --cov=pyforge --cov-report=term-missing
+
+      - name: Build package
+        run: python -m build
+
+      - name: Validate distribution artifacts
+        run: python scripts/check_distribution.py
+
+      - name: Install the wheel in a clean environment
+        run: |
+          python -m venv "$RUNNER_TEMP/from-wheel"
+          "$RUNNER_TEMP/from-wheel/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/from-wheel/bin/python" -c "from pyforge import RetryPolicy, retry; assert RetryPolicy().delay_for(1) == 0.25; assert callable(retry)"
+
+      - name: Install the sdist in a clean environment
+        run: |
+          python -m venv "$RUNNER_TEMP/from-sdist"
+          "$RUNNER_TEMP/from-sdist/bin/python" -m pip install dist/*.tar.gz
+          "$RUNNER_TEMP/from-sdist/bin/python" -c "from pyforge import RetryPolicy; assert RetryPolicy().max_attempts == 3"
