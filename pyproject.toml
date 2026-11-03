@@ -59,6 +59,8 @@ mypy_path = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# CI runs the pytest script, which does not keep the working directory importable.
+pythonpath = ["."]
 addopts = "-ra"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
