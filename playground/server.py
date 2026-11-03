@@ -83,10 +83,11 @@ def _logging_demo() -> dict[str, Any]:
     base_logger.setLevel(logging.INFO)
     base_logger.propagate = False
     try:
-        logger.info(
-            "Payment reconciliation completed",
-            extra={"invoice_id": "INV-2048", "api_key": "demo-secret-value"},
-        )
+        logger.info({
+            "event": "payment.reconciliation.completed",
+            "invoice_id": "INV-2048",
+            "api_key": "demo-secret-value",
+        })
     finally:
         base_logger.removeHandler(handler)
         base_logger.setLevel(previous_level)
@@ -141,7 +142,9 @@ def _http_demo() -> dict[str, Any]:
 
 
 def _observe_demo() -> dict[str, Any]:
-    return _retry_demo()
+    result = _retry_demo()
+    result["summary"] = "The retry observer captured each lifecycle event from a real retry run."
+    return result
 
 
 def _cache_demo() -> dict[str, Any]:
@@ -150,11 +153,15 @@ def _cache_demo() -> dict[str, Any]:
     cache.set("session:A", {"user": "Ava"}, ttl=5)
     cache.set("session:B", {"user": "Noah"})
     first = cache.get("session:A")
-    cache.get("session:B")
     cache.set("session:C", {"user": "Mia"})
-    after_eviction = {"A": "session:A" in cache, "B": "session:B" in cache, "C": "session:C" in cache}
+    after_eviction = {
+        "A": "session:A" in cache,
+        "B": "session:B" in cache,
+        "C": "session:C" in cache,
+    }
     clock.advance(5)
     expired = "session:A" in cache
+    stats = cache.stats()
     return {
         "summary": "A real MemoryCache demonstrates LRU eviction and monotonic TTL expiry.",
         "result": {
@@ -164,9 +171,9 @@ def _cache_demo() -> dict[str, Any]:
             "session_A_expired": expired,
             "remaining_entries": len(cache),
             "stats": {
-                "hits": cache.stats().hits,
-                "misses": cache.stats().misses,
-                "evictions": cache.stats().evictions,
+                "hits": stats.hits,
+                "misses": stats.misses,
+                "evictions": stats.evictions,
             },
         },
         "note": "The clock is fake, so this demo runs instantly and never waits five seconds.",
@@ -232,8 +239,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {"status": "ok", "package": "pyforge-toolkit"})
             return
         if path in ("/", "/index.html"):
-            target = STATIC / "index.html"
-            self._send(200, target.read_bytes(), "text/html")
+            self._send(200, (STATIC / "index.html").read_bytes(), "text/html")
             return
         if path == "/app.js":
             self._send(200, (STATIC / "app.js").read_bytes(), "text/javascript")
@@ -261,7 +267,6 @@ class Handler(BaseHTTPRequestHandler):
             self._send(500, {"error": type(exc).__name__, "message": str(exc)})
 
     def log_message(self, format: str, *args: object) -> None:
-        # Keep the terminal quiet; execution output belongs in the dashboard.
         return
 
 
