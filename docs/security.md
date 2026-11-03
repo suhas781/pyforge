@@ -167,12 +167,31 @@ frontend. `build` is used to produce artifacts; application code does not
 import it.
 
 Minimum versions are declared in `pyproject.toml`. They are not hash-pinned.
-GitHub Actions are pinned to major tags (`actions/checkout@v4` and
-`actions/setup-python@v5`), not to commit SHAs. This repository does not run
-`pip-audit`, `safety`, or another vulnerability database in CI. Absence of a
-scanner result is not a claim that those tools are free of issues. Review any
-new dependency before adding it, and do not add a runtime dependency for a
-feature that the standard library already covers.
+`actions/checkout` is pinned to commit `11d5960a326750d5838078e36cf38b85af677262`
+(`v4.4.0`). `actions/setup-python` is pinned to commit
+`a26af69be951a213d495a4c3e4e4022e16d87065` (`v5.6.0`). Those commits were the
+targets of the published tags when this file was updated, and GitHub marked
+the commits verified. A later tag can move. The pin does not move with it.
+Review any new dependency before adding it, and do not add a runtime
+dependency for a feature that the standard library already covers.
+
+CI installs `setuptools>=77` and `wheel` before the development extra, which
+matches the build-system floor, then runs
+`python scripts/audit_installed_packages.py`. The script asks the OSV database
+about every other installed distribution. It skips `pyforge-toolkit` because
+that project is not on PyPI, so OSV cannot describe it. When OSV returns no
+advisory, the script says so and exits successfully. That result is limited
+to the versions installed in that environment at that time. It is not a
+statement that those packages, the Actions commits, or PyForge have no
+vulnerabilities. A network or response failure exits with status 2 rather
+than reporting a clean result.
+
+If a local virtual environment still has an older `setuptools`, the audit can
+report advisories for that copy. The remediation is
+`python -m pip install "setuptools>=77" wheel`, then run the script again.
+`python -m build` already installs its own `setuptools>=77` in an isolated
+environment. The audit does not scan that isolated environment unless those
+versions are the ones installed in the interpreter running the script.
 
 CI does not publish artifacts. A later upload is a separate owner decision
 described in the release checklist.

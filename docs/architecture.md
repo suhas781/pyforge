@@ -304,7 +304,8 @@ register an observer, start a thread, or open a network connection.
 - [API reference](api-reference.md) for parameters, return values, and exceptions.
 - [Security notes](security.md) for idempotency, secrets, and dependencies.
 - [Changelog](../CHANGELOG.md) for the 0.1.0 alpha and unreleased work.
-- [Release checklist](releasing.md) for a later tag and PyPI upload.
+- [Release checklist](releasing.md) for a later tag and PyPI upload. Publication
+  still requires explicit owner approval. CI does not publish.
 - [ADR 0002](decisions/0002-structured-logging.md) for the logging decision.
 - [ADR 0003](decisions/0003-environment-configuration.md) for the configuration decision.
 - [ADR 0004](decisions/0004-http-resilience.md) for the HTTP retry decision.
@@ -312,3 +313,4 @@ register an observer, start a thread, or open a network connection.
 - [ADR 0006](decisions/0006-in-memory-cache.md) for the cache decision.
 - [ADR 0007](decisions/0007-testing-utilities.md) for the testing-helper decision.
 - [ADR 0008](decisions/0008-release-readiness.md) for the decision not to publish automatically.
+- [ADR 0009](decisions/0009-dependency-audit.md) for the OSV audit decision.
