@@ -33,6 +33,89 @@ function openModule(name) {
   $("output").innerHTML = '<div class="empty-symbol">⌁</div><strong>Waiting for execution</strong><p>Run the example to see the actual Python result here.</p>';
 }
 
+const RESULT_LABELS = {
+  final_result: "Final result",
+  total_attempts: "Total attempts",
+  retry_delays: "Retry delays",
+  lifecycle_events: "Lifecycle events"
+};
+const EVENT_LABELS = {
+  event_type: "Event type",
+  attempt: "Attempt number",
+  max_attempts: "Maximum attempts",
+  delay: "Delay",
+  exception_type: "Exception type"
+};
+
+function labelFor(key, labels) {
+  return (labels && labels[key]) || key;
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isObjectArray(value) {
+  return Array.isArray(value) && value.length > 0 && value.every(isRecord);
+}
+
+function renderScalar(value) {
+  if (value === null) return '<span class="result-null">null</span>';
+  return escapeHtml(typeof value === "string" ? value : JSON.stringify(value));
+}
+
+function renderJson(value) {
+  return '<pre class="result-json">' + escapeHtml(JSON.stringify(value, null, 2)) + "</pre>";
+}
+
+function renderTable(rows) {
+  const columns = [];
+  rows.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (!columns.includes(key)) columns.push(key);
+    });
+  });
+  const labels = columns.includes("event_type") ? EVENT_LABELS : null;
+  const head = columns.map((key) => "<th>" + escapeHtml(labelFor(key, labels)) + "</th>").join("");
+  const body = rows.map((row) => {
+    const cells = columns.map((key) => {
+      if (!Object.prototype.hasOwnProperty.call(row, key)) return "<td></td>";
+      const value = row[key];
+      if (isRecord(value) || Array.isArray(value)) return "<td>" + renderJson(value) + "</td>";
+      return "<td>" + renderScalar(value) + "</td>";
+    }).join("");
+    return "<tr>" + cells + "</tr>";
+  }).join("");
+  return '<div class="result-table-wrap"><table class="result-table"><thead><tr>' + head + "</tr></thead><tbody>" + body + "</tbody></table></div>";
+}
+
+function renderValue(value) {
+  if (isObjectArray(value)) return renderTable(value);
+  if (isRecord(value)) {
+    const fields = Object.keys(value).map((key) => {
+      return '<section class="result-field"><h3 class="result-field-label">' + escapeHtml(labelFor(key, RESULT_LABELS)) + '</h3><div class="result-field-body">' + renderValue(value[key]) + "</div></section>";
+    }).join("");
+    return '<div class="result-fields">' + fields + "</div>";
+  }
+  if (Array.isArray(value)) return renderJson(value);
+  return '<div class="result-field-value">' + renderScalar(value) + "</div>";
+}
+
+function renderResult(value) {
+  if (isRecord(value)) return renderValue(value);
+  return '<div class="result-field">' + renderValue(value) + "</div>";
+}
+
+function renderFailure(detail) {
+  const lines = [];
+  if (detail.status) lines.push("HTTP " + detail.status);
+  if (detail.error) lines.push(detail.error);
+  if (detail.message) lines.push(detail.message);
+  const note = detail.hint ? '<p class="result-note">' + escapeHtml(detail.hint) + "</p>" : "";
+  $("output").className = "result-wrap";
+  $("output").innerHTML = '<div class="result-status error-status"><span class="status-dot"></span> EXECUTION ERROR</div><pre class="result-json">' + escapeHtml(lines.join("\n")) + "</pre>" + note;
+}
+
 async function runDemo() {
   const button = $("run-button");
   button.disabled = true;
@@ -40,18 +123,54 @@ async function runDemo() {
   $("output").className = "output-empty";
   $("output").innerHTML = '<div class="empty-symbol">◌</div><strong>Executing Python example</strong><p>Calling the installed PyForge package...</p>';
   try {
-    const response = await fetch("/api/run", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({module: activeModule})
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.message || payload.error || "Execution failed");
+    let response;
+    try {
+      response = await fetch("/api/run", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({module: activeModule})
+      });
+    } catch (error) {
+      renderFailure({
+        message: "The playground server did not respond.",
+        hint: "Start it with python -m playground.server and reload this page."
+      });
+      return;
+    }
+    const text = await response.text();
+    let payload = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        renderFailure({status: response.status, message: "The server response was not JSON."});
+        return;
+      }
+    }
+    if (!response.ok || !isRecord(payload)) {
+      renderFailure({
+        status: response.status,
+        error: payload && payload.error,
+        message: (payload && payload.message) || "The request failed."
+      });
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(payload, "result")) {
+      renderFailure({
+        status: response.status,
+        error: "Incomplete response",
+        message: "The server response did not include a result."
+      });
+      return;
+    }
+    const summary = typeof payload.summary === "string" && payload.summary
+      ? '<p class="result-summary">' + escapeHtml(payload.summary) + "</p>"
+      : "";
+    const note = typeof payload.note === "string" && payload.note
+      ? '<p class="result-note">' + escapeHtml(payload.note) + "</p>"
+      : "";
     $("output").className = "result-wrap";
-    $("output").innerHTML = '<div class="result-status"><span class="status-dot"></span> EXECUTION COMPLETE</div><p class="result-summary">' + escapeHtml(payload.summary || "Demo completed.") + '</p><pre class="result-json">' + escapeHtml(JSON.stringify(payload.result, null, 2)) + '</pre>' + (payload.note ? '<p class="result-note">' + escapeHtml(payload.note) + '</p>' : "");
-  } catch (error) {
-    $("output").className = "result-wrap";
-    $("output").innerHTML = '<div class="result-status error-status"><span class="status-dot"></span> EXECUTION ERROR</div><pre class="result-json">' + escapeHtml(error.message) + '</pre><p class="result-note">Check that the server is running and that PyForge is installed in the active Python environment.</p>';
+    $("output").innerHTML = '<div class="result-status"><span class="status-dot"></span> EXECUTION COMPLETE</div>' + summary + renderResult(payload.result) + note;
   } finally {
     button.disabled = false;
     button.innerHTML = "<span>▶</span> Run example";
