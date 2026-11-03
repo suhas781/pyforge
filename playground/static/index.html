@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090d16">
+  <title>PyForge Playground</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="PyForge Playground home">
+        <span class="brand-mark">P</span>
+        <span><strong>PYFORGE</strong><small>ENGINEERING PLAYGROUND</small></span>
+      </a>
+      <div class="side-label">WORKSPACE</div>
+      <button class="nav-item active" data-module="overview"><span>◈</span> Overview</button>
+      <div class="side-label">MODULES</div>
+      <button class="nav-item" data-module="retry"><span>↻</span> Retry Engine <i>01</i></button>
+      <button class="nav-item" data-module="logging"><span>▤</span> JSON Logging <i>02</i></button>
+      <button class="nav-item" data-module="config"><span>⚙</span> Configuration <i>03</i></button>
+      <button class="nav-item" data-module="http"><span>⇄</span> HTTP Resilience <i>04</i></button>
+      <button class="nav-item" data-module="observe"><span>⌁</span> Observability <i>05</i></button>
+      <button class="nav-item" data-module="cache"><span>▦</span> Memory Cache <i>06</i></button>
+      <button class="nav-item" data-module="testing"><span>⌘</span> Testing Utilities <i>07</i></button>
+      <div class="sidebar-bottom">
+        <span class="status-dot"></span><span>LOCAL RUNTIME</span>
+        <small>Python · 127.0.0.1</small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumbs">PLAYGROUND <span>/</span> <b id="crumb">OVERVIEW</b></div>
+        <div class="top-actions"><span class="runtime-pill"><span class="status-dot"></span> Connected to Python</span><span class="version">v0.1.0 · ALPHA</span></div>
+      </header>
+      <section class="content">
+        <div class="hero">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> INTERACTIVE LAB / 001</div>
+            <h1 id="page-title">See what <em>PyForge</em> can do.</h1>
+            <p id="page-subtitle">Run real Python examples, inspect results, and explore each engineering primitive.</p>
+          </div>
+          <div class="hero-orb"><div class="orb-core">PF</div></div>
+        </div>
+
+        <div id="overview" class="view">
+          <div class="section-head"><div><div class="eyebrow">SYSTEM MODULES</div><h2>Choose a playground</h2></div><span class="muted">7 INTERACTIVE MODULES</span></div>
+          <div class="module-grid">
+            <button class="module-card blue" data-open="retry"><span class="card-icon">↻</span><span class="card-index">01 / RESILIENCE</span><strong>Retry Engine</strong><small>Exponential backoff, attempts and recovery.</small><span class="card-link">OPEN MODULE ↗</span></button>
+            <button class="module-card green" data-open="logging"><span class="card-icon">▤</span><span class="card-index">02 / TELEMETRY</span><strong>JSON Logging</strong><small>Structured records, context and redaction.</small><span class="card-link">OPEN MODULE ↗</span></button>
+            <button class="module-card amber" data-open="config"><span class="card-icon">⚙</span><span class="card-index">03 / CONFIGURATION</span><strong>Environment Config</strong><small>Typed values, defaults and validation.</small><span class="card-link">OPEN MODULE ↗</span></button>
+            <button class="module-card violet" data-open="http"><span class="card-icon">⇄</span><span class="card-index">04 / NETWORK RULES</span><strong>HTTP Resilience</strong><small>Method safety and retryable status codes.</small><span class="card-link">OPEN MODULE ↗</span></button>
+            <button class="module-card cyan" data-open="observe"><span class="card-icon">⌁</span><span class="card-index">05 / LIFECYCLE</span><strong>Retry Observability</strong><small>Watch scheduled, succeeded and exhausted events.</small><span class="card-link">OPEN MODULE ↗</span></button>
+            <button class="module-card pink" data-open="cache"><span class="card-icon">▦</span><span class="card-index">06 / STORAGE</span><strong>Memory Cache</strong><small>TTL expiration, LRU eviction and statistics.</small><span class="card-link">OPEN MODULE ↗</span></button>
+            <button class="module-card orange" data-open="testing"><span class="card-icon">⌘</span><span class="card-index">07 / TEST TOOLING</span><strong>Testing Utilities</strong><small>Fake clocks, recorded sleeps and scripted calls.</small><span class="card-link">OPEN MODULE ↗</span></button>
+          </div>
+          <div class="bottom-note"><span class="status-dot"></span><div><strong>Real package. Real execution.</strong><small>Every Run action calls the installed PyForge package through a local Python server. Nothing here is a pre-recorded mock.</small></div></div>
+        </div>
+
+        <div id="module-view" class="view hidden">
+          <div class="workspace-head">
+            <div><div class="eyebrow" id="module-kicker">MODULE / 01</div><h2 id="module-title">Retry Engine</h2><p id="module-description">Exercise bounded retries with deterministic timing.</p></div>
+            <button class="run-button" id="run-button"><span>▶</span> Run example</button>
+          </div>
+          <div class="workspace-grid">
+            <section class="panel scenario-panel">
+              <div class="panel-heading"><span>01 / SCENARIO</span><span class="panel-tag">INPUT</span></div>
+              <div id="scenario-content"></div>
+              <div class="scenario-foot"><span class="status-dot"></span> SAFE LOCAL DEMO <span class="spacer"></span><span>NO EXTERNAL REQUESTS</span></div>
+            </section>
+            <section class="panel output-panel">
+              <div class="panel-heading"><span>02 / EXECUTION OUTPUT</span><span class="panel-tag live-tag">LIVE RESULT</span></div>
+              <div id="output" class="output-empty"><div class="empty-symbol">⌁</div><strong>Waiting for execution</strong><p>Run the example to see the actual Python result here.</p></div>
+            </section>
+          </div>
+        </div>
+        <footer><span>PYFORGE PLAYGROUND</span><span>BUILT FOR EXPLORATION <b>·</b> RUNS LOCALLY</span></footer>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
