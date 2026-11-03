@@ -113,7 +113,9 @@ def _config_demo() -> dict[str, Any]:
             "name": get_env("PYFORGE_DEMO_NAME", required=True),
             "enabled": get_env_bool("PYFORGE_DEMO_ENABLED", required=True),
             "workers": get_env_int("PYFORGE_DEMO_WORKERS", required=True, minimum=1, maximum=32),
-            "timeout": get_env_float("PYFORGE_DEMO_TIMEOUT", required=True, minimum=0.1, maximum=10),
+            "timeout": get_env_float(
+                "PYFORGE_DEMO_TIMEOUT", required=True, minimum=0.1, maximum=10
+            ),
         }
     return {
         "summary": "All four readers parsed values from a temporary environment.",
