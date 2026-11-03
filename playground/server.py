@@ -3,6 +3,7 @@
 Run from the repository root with: python -m playground.server
 The server binds only to 127.0.0.1 and exposes a fixed set of demo actions.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,16 +14,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+import pyforge
 from pyforge import (
-    JsonFormatter,
-    LogContext,
     MemoryCache,
+    RetryEvent,
     RetryPolicy,
     get_env,
     get_env_bool,
     get_env_float,
     get_env_int,
-    get_logger,
     retry,
     should_retry_http,
 )
@@ -32,42 +32,51 @@ ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 
 
+def _lifecycle_event(event: RetryEvent) -> dict[str, Any]:
+    return {
+        "event_type": event.event_type.value,
+        "attempt": event.attempt,
+        "max_attempts": event.max_attempts,
+        "delay": event.delay,
+        "exception_type": event.exception_type,
+    }
+
+
 def _retry_demo() -> dict[str, Any]:
     sleeper = RecordingSleeper()
     events: list[dict[str, Any]] = []
     attempts = FailThenReturn(2, "Inventory sync completed", TimeoutError)
+
+    def observe(event: RetryEvent) -> None:
+        events.append(_lifecycle_event(event))
 
     @retry(
         policy=RetryPolicy(max_attempts=4, initial_delay=0.2, max_delay=1.0, multiplier=2),
         retry_on=(TimeoutError,),
         sleep=sleeper,
         random_value=lambda: 0.5,
-        observer=lambda event: events.append({
-            "event": event.event_type.value,
-            "attempt": event.attempt,
-            "max_attempts": event.max_attempts,
-            "delay": event.delay,
-            "exception_type": event.exception_type,
-        }),
+        observer=observe,
     )
     def operation() -> str:
         return attempts()
 
-    result = operation()
+    final_result = operation()
     return {
         "summary": "The operation recovered after two simulated timeouts.",
-        "result": result,
-        "attempts": attempts.count,
-        "delays": list(sleeper.delays),
-        "events": events,
+        "result": {
+            "final_result": final_result,
+            "total_attempts": attempts.count,
+            "retry_delays": list(sleeper.delays),
+            "lifecycle_events": events,
+        },
     }
 
 
 def _logging_demo() -> dict[str, Any]:
     stream = StringIO()
-    logger = get_logger(
+    logger = pyforge.get_logger(
         "pyforge.playground",
-        context=LogContext(
+        context=pyforge.LogContext(
             request_id="req-demo-1042",
             operation="payment.reconcile",
             component="playground",
@@ -76,18 +85,20 @@ def _logging_demo() -> dict[str, Any]:
     )
     base_logger = logger.logger
     handler = logging.StreamHandler(stream)
-    handler.setFormatter(JsonFormatter())
+    handler.setFormatter(pyforge.JsonFormatter())
     previous_level = base_logger.level
     previous_propagate = base_logger.propagate
     base_logger.addHandler(handler)
     base_logger.setLevel(logging.INFO)
     base_logger.propagate = False
     try:
-        logger.info({
-            "event": "payment.reconciliation.completed",
-            "invoice_id": "INV-2048",
-            "api_key": "demo-secret-value",
-        })
+        logger.info(
+            {
+                "event": "payment.reconciliation.completed",
+                "invoice_id": "INV-2048",
+                "api_key": "demo-secret-value",
+            }
+        )
     finally:
         base_logger.removeHandler(handler)
         base_logger.setLevel(previous_level)
@@ -103,12 +114,14 @@ def _logging_demo() -> dict[str, Any]:
 
 
 def _config_demo() -> dict[str, Any]:
-    with temporary_env({
-        "PYFORGE_DEMO_NAME": "playground",
-        "PYFORGE_DEMO_ENABLED": " true ",
-        "PYFORGE_DEMO_WORKERS": "8",
-        "PYFORGE_DEMO_TIMEOUT": "1.75",
-    }):
+    with temporary_env(
+        {
+            "PYFORGE_DEMO_NAME": "playground",
+            "PYFORGE_DEMO_ENABLED": " true ",
+            "PYFORGE_DEMO_WORKERS": "8",
+            "PYFORGE_DEMO_TIMEOUT": "1.75",
+        }
+    ):
         values = {
             "name": get_env("PYFORGE_DEMO_NAME", required=True),
             "enabled": get_env_bool("PYFORGE_DEMO_ENABLED", required=True),
@@ -144,9 +157,11 @@ def _http_demo() -> dict[str, Any]:
 
 
 def _observe_demo() -> dict[str, Any]:
-    result = _retry_demo()
-    result["summary"] = "The retry observer captured each lifecycle event from a real retry run."
-    return result
+    recorded = _retry_demo()
+    return {
+        "summary": "The retry observer captured each lifecycle event from a real retry run.",
+        "result": recorded["result"]["lifecycle_events"],
+    }
 
 
 def _cache_demo() -> dict[str, Any]:
@@ -225,8 +240,10 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "PyForgePlayground/1.0"
 
     def _send(self, status: int, payload: object, content_type: str = "application/json") -> None:
-        body = payload if isinstance(payload, bytes) else (
-            json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        body = (
+            payload
+            if isinstance(payload, bytes)
+            else (json.dumps(payload, ensure_ascii=False).encode("utf-8"))
         )
         self.send_response(status)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
@@ -251,19 +268,34 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(404, {"error": "Not found"})
 
+    def _client_error(self, error: str, message: str) -> None:
+        self._send(400, {"error": error, "message": message})
+
     def do_POST(self) -> None:
         if urlparse(self.path).path != "/api/run":
-            self._send(404, {"error": "Not found"})
+            self._send(
+                404,
+                {"error": "Not found", "message": "The requested path is not available."},
+            )
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if length < 1 or length > 10_000:
-                raise ValueError("Request body must be between 1 and 10000 bytes")
+        except ValueError:
+            self._client_error("Bad request", "Content-Length is not an integer.")
+            return
+        if length < 1 or length > 10_000:
+            self._client_error("Bad request", "Request body must be between 1 and 10000 bytes.")
+            return
+        try:
             payload = json.loads(self.rfile.read(length))
-            module = payload.get("module") if isinstance(payload, dict) else None
-            if module not in DEMOS:
-                self._send(400, {"error": "Unknown demo module"})
-                return
+        except json.JSONDecodeError:
+            self._client_error("Invalid JSON", "The request body is not valid JSON.")
+            return
+        module = payload.get("module") if isinstance(payload, dict) else None
+        if not isinstance(module, str) or module not in DEMOS:
+            self._client_error("Unknown demo module", "The requested module is not available.")
+            return
+        try:
             self._send(200, {"module": module, **DEMOS[module]()})
         except Exception as exc:
             self._send(500, {"error": type(exc).__name__, "message": str(exc)})
