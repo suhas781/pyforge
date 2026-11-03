@@ -8,8 +8,10 @@ Following it in this milestone does not create that release.
 
 `.github/workflows/ci.yml` runs on pull requests to `main` and on pushes to
 `main`. Its permission is `contents: read`. It lints, checks formatting,
-type-checks, tests with coverage, builds the package, validates the wheel and
-sdist, and installs both artifacts in clean environments.
+type-checks, tests with coverage, queries OSV for the installed third-party
+packages, builds the package, validates the wheel and sdist, and installs
+both artifacts in clean environments. `actions/checkout` and
+`actions/setup-python` are pinned to commit SHAs in the workflow file.
 
 That workflow does not create a Git tag, a GitHub release, or a PyPI upload.
 There is no `workflow_dispatch` publish job, no PyPI environment, and no
@@ -46,13 +48,22 @@ must not run from `push` or `pull_request`.
 Run these on the release commit:
 
 ```bash
+python -m pip install --upgrade pip "setuptools>=77" wheel
+python -m pip install -e ".[dev]"
 ruff check .
 ruff format --check .
 mypy src
 pytest --cov=pyforge --cov-report=term-missing
+python scripts/audit_installed_packages.py
 python -m build
 python scripts/check_distribution.py
 ```
+
+The audit command needs network access. Read its output. A line that says no
+advisory was returned is not approval to publish, and it is not a claim that
+no vulnerabilities exist. Publishing still requires the owner's explicit
+approval later in this checklist. The package remains
+`Development Status :: 3 - Alpha` until the owner changes that classifier.
 
 Install `dist/pyforge_toolkit-<version>-py3-none-any.whl` and the sdist in two
 new virtual environments. Confirm `pyforge.__version__` matches the chosen
