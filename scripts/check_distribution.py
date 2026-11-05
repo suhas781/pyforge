@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 import tarfile
 import zipfile
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +55,17 @@ SDIST_SUFFIXES = (
     "src/pyforge/testing.py",
     "src/pyforge/py.typed",
 )
+_DIST_INFO = f"{EXPECTED_NAME.replace('-', '_')}-{EXPECTED_VERSION}.dist-info"
+EXPECTED_DIST_INFO_FILES = (
+    f"{_DIST_INFO}/METADATA",
+    f"{_DIST_INFO}/WHEEL",
+    f"{_DIST_INFO}/RECORD",
+    f"{_DIST_INFO}/top_level.txt",
+    f"{_DIST_INFO}/licenses/LICENSE",
+)
+# This is the member set produced by the current setuptools build. The license
+# is permitted only at its dist-info path. Any other archive member is rejected.
+EXPECTED_WHEEL_MEMBERS = frozenset([*WHEEL_FILES, *EXPECTED_DIST_INFO_FILES])
 
 
 def main() -> None:
@@ -74,6 +86,7 @@ def main() -> None:
 def _check_wheel(path: Path) -> None:
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
+        _reject_unexpected_wheel_members(path.name, names)
         missing = [item for item in WHEEL_FILES if item not in names]
         if missing:
             raise SystemExit(f"{path.name} is missing {missing}")
@@ -155,6 +168,72 @@ def package_python_modules(names: list[str]) -> set[str]:
         if normalized.startswith("pyforge/") and normalized.endswith(".py"):
             modules.add(normalized)
     return modules
+
+
+def _normalize_wheel_member(name: str) -> str:
+    """Return a wheel member path without collapsing parent segments.
+
+    Backslashes become slashes, and a leading ``./`` is removed. ``../`` stays
+    in the path so it cannot be rewritten into an allow-list entry.
+    """
+    normalized = name.replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def _wheel_member_problem(name: str) -> str | None:
+    """Return why a raw archive member is unsafe, or ``None`` when it is well formed."""
+    if name == "" or "\0" in name:
+        return "malformed"
+    slashed = name.replace("\\", "/")
+    normalized = _normalize_wheel_member(name)
+    if (
+        slashed.startswith("/")
+        or normalized.startswith("/")
+        or (len(slashed) >= 2 and slashed[1] == ":")
+        or (len(normalized) >= 2 and normalized[1] == ":")
+    ):
+        return "absolute"
+    parts = normalized.split("/")
+    if any(part == ".." for part in parts):
+        return "traversal"
+    if not normalized or any(part in {"", "."} for part in parts):
+        return "malformed"
+    return None
+
+
+def _duplicates(values: list[str]) -> list[str]:
+    counts = Counter(values)
+    return sorted(item for item, count in counts.items() if count > 1)
+
+
+def _reject_unexpected_wheel_members(label: str, names: list[str]) -> None:
+    """Reject every wheel member outside the exact build allow-list.
+
+    The allow-list is ``EXPECTED_WHEEL_MEMBERS``. Paths are normalized only by
+    slash direction and a leading ``./``. Absolute paths, parent traversal,
+    malformed paths, and duplicate members are rejected even when the remaining
+    names match.
+    """
+    problems: list[str] = []
+    normalized: list[str] = []
+    for name in names:
+        problem = _wheel_member_problem(name)
+        if problem is not None:
+            problems.append(f"{name} ({problem})")
+            continue
+        normalized.append(_normalize_wheel_member(name))
+    duplicate_names = sorted(set(_duplicates(names)) | set(_duplicates(normalized)))
+    found = set(normalized)
+    missing = sorted(EXPECTED_WHEEL_MEMBERS - found)
+    extra = sorted(found - EXPECTED_WHEEL_MEMBERS)
+    if problems or duplicate_names or missing or extra:
+        raise SystemExit(
+            f"{label} members do not match the allow-list: "
+            f"unsafe={problems} duplicate={duplicate_names} "
+            f"missing={missing} extra={extra}"
+        )
 
 
 def _reject_unexpected_python_modules(label: str, names: list[str]) -> None:
