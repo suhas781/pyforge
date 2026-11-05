@@ -67,6 +67,8 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
 branch = true
+# This percentage is the installable package only. playground and scripts are
+# typechecked and have their own tests; they are not folded into this number.
 source = ["pyforge"]
 
 [tool.coverage.report]
