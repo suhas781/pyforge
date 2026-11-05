@@ -26,11 +26,12 @@ must not run from `push` or `pull_request`.
 ## Before changing the version
 
 1. Choose the version. `0.1.0` remains the alpha until the owner selects the
-   first public version. The features listed under `Unreleased` in
-   `CHANGELOG.md` are not yet folded into a released section.
+   first public version. The current `0.1.0` changelog section describes the
+   source tree. It is not a tag and not a PyPI publication. Future changes
+   belong under `Unreleased` until they ship.
 2. Confirm `main` is the commit that will be released, and that the working
    tree is clean.
-3. Read `CHANGELOG.md` and move the `Unreleased` notes into the section for
+3. Read `CHANGELOG.md` and move any `Unreleased` notes into the section for
    the chosen version. Do not leave shipped behavior only under `Unreleased`.
 4. Set the same version in `pyproject.toml`, in `pyforge.__version__`, and in
    `EXPECTED_VERSION`, `EXPECTED_WHEEL`, and `EXPECTED_SDIST` inside

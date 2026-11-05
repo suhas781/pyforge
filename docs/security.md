@@ -175,8 +175,28 @@ the commits verified. A later tag can move. The pin does not move with it.
 Review any new dependency before adding it, and do not add a runtime
 dependency for a feature that the standard library already covers.
 
-CI installs `setuptools>=77` and `wheel` before the development extra, which
-matches the build-system floor, then runs
+Local setup and CI both install the build-system floor before the development
+extra:
+
+```bash
+python -m pip install --upgrade pip "setuptools>=77" wheel
+python -m pip install -e ".[dev]"
+```
+
+The verification commands that follow, in `README.md`, `CONTRIBUTING.md`, and
+`docs/releasing.md`, are:
+
+```bash
+ruff check .
+ruff format --check .
+mypy src
+pytest --cov=pyforge --cov-report=term-missing
+python scripts/audit_installed_packages.py
+python -m build
+python scripts/check_distribution.py
+```
+
+CI uses that install, then runs
 `python scripts/audit_installed_packages.py`. The script asks the OSV database
 about every other installed distribution. It skips `pyforge-toolkit` because
 that project is not on PyPI, so OSV cannot describe it. When OSV returns no
@@ -196,8 +216,19 @@ versions are the ones installed in the interpreter running the script.
 CI does not publish artifacts. A later upload is a separate owner decision
 described in the release checklist.
 
+## Playground
+
+`playground/` is a repository development tool. It is not part of the
+installed wheel. `python -m playground.server` binds to `127.0.0.1` port
+`8765`. It serves a fixed page and runs only the names in the server's
+`DEMOS` mapping. It does not accept arbitrary Python. Request bodies must be
+JSON of 1 to 10,000 bytes. There is no authentication. The server is for
+local development on that machine. It is not a public deployment. When a
+demonstration raises, the HTTP 500 body includes the exception type and
+`str(exc)`, so that text is visible in the local browser.
+
 ## Package contents
 
 The wheel is the installable library: `pyforge`, its `py.typed` marker, and
-the MIT license. Tests are not part of the wheel. Installing the package does
-not enable telemetry or background work.
+the MIT license. Tests, `playground/`, and `scripts/` are not part of the
+wheel. Installing the package does not enable telemetry or background work.

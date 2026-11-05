@@ -2,12 +2,18 @@
 
 PyForge uses semantic versioning once a stable public API exists. The source
 tree declares version `0.1.0`. No Git tag has been published, and this
-project has not been uploaded to PyPI.
+project has not been uploaded to PyPI. The `0.1.0` section describes the
+capabilities in that source tree. It is not a release announcement.
 
 ## Unreleased
 
-These notes describe the current source tree. They are not a release
-announcement.
+No changes are waiting beyond the `0.1.0` source tree. Put future work here.
+
+## 0.1.0 — 2026-11-02
+
+Version identifier in the source tree. This heading is not a Git tag and not
+a PyPI release. `2026-11-02` is the date that version identifier was recorded.
+It is not a publication date for the capabilities below.
 
 ### Added
 
@@ -36,6 +42,10 @@ announcement.
   `AsyncRecordingSleeper`, `CallCount`, `FailThenReturn`, `ClockedCache`, and
   `temporary_env`. Importing `pyforge` does not load these helpers. They do
   not sleep, patch the standard library, or add a runtime dependency.
+- The version string `0.1.0` in `pyproject.toml` and `pyforge.__version__`.
+
+Repository tools. These are not part of the installed `pyforge` wheel:
+
 - Release checklist in `docs/releasing.md`. Project metadata records the
   repository URLs. The license remains the `MIT` expression. CI does not tag
   or publish.
@@ -45,15 +55,9 @@ announcement.
   no vulnerabilities exist.
 - `actions/checkout` and `actions/setup-python` are pinned to commit SHAs.
   The workflow permission remains `contents: read`.
-
-## 0.1.0 — 2026-11-02
-
-Version identifier in the source tree. This heading is not a Git tag and not
-a PyPI release.
-
-### Added
-
-- The version string `0.1.0` in `pyproject.toml` and `pyforge.__version__`.
+- `playground/` is a local development server for fixed demonstrations. It
+  binds to `127.0.0.1:8765`, has no authentication, and is not a public
+  deployment.
 
 ### Not included
 

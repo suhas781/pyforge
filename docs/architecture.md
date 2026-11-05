@@ -7,7 +7,9 @@ bounded retry, JSON logging, environment-backed configuration, HTTP retry
 decisions, retry events, a process-local memory cache, and deterministic
 test helpers. There is no HTTP client in the package.
 
-The public API is:
+`pyforge.__version__` is `0.1.0`.
+
+This import is an illustrative subset, not the complete public surface:
 
 ```python
 from pyforge import (
@@ -26,7 +28,48 @@ from pyforge import (
 )
 ```
 
-`pyforge.__version__` is `0.1.0`.
+The root export list is `pyforge.__all__`, in this order:
+
+```python
+__all__ = [
+    "CONTEXT_FIELD_NAMES",
+    "DEFAULT_RETRYABLE_HTTP_EXCEPTIONS",
+    "DEFAULT_RETRYABLE_STATUS_CODES",
+    "IDEMPOTENT_HTTP_METHODS",
+    "REDACTED",
+    "SENSITIVE_FIELD_NAMES",
+    "SENSITIVE_FIELD_SUFFIXES",
+    "CacheStats",
+    "InvalidEnvironmentError",
+    "JsonFormatter",
+    "LogContext",
+    "MemoryCache",
+    "MissingEnvironmentError",
+    "OutOfRangeEnvironmentError",
+    "RetryEvent",
+    "RetryEventType",
+    "RetryObserver",
+    "RetryPolicy",
+    "RetryableHTTPStatus",
+    "get_env",
+    "get_env_bool",
+    "get_env_float",
+    "get_env_int",
+    "get_logger",
+    "is_idempotent_method",
+    "is_retryable_status",
+    "raise_for_retryable_status",
+    "retry",
+    "retry_http",
+    "should_retry_http",
+]
+```
+
+`pyforge.testing` is installed with the package and is not in that list.
+Importing `pyforge` does not load it. Its public names are
+`pyforge.testing.__all__`: `AsyncRecordingSleeper`, `CallCount`,
+`ClockedCache`, `FailThenReturn`, `FakeClock`, `RecordingSleeper`, and
+`temporary_env`.
 
 ## Module boundaries
 
@@ -50,8 +93,9 @@ from pyforge import (
 - `pyforge.testing`: fake clock, recorded sleep, scripted calls, and a
   temporary environment block. The package root does not import it.
 - `tests/test_retry.py`, `tests/test_logging.py`, `tests/test_config.py`,
-  `tests/test_http.py`, `tests/test_observe.py`, `tests/test_cache.py`, and
-  `tests/test_testing.py`: deterministic unit tests.
+  `tests/test_http.py`, `tests/test_observe.py`, `tests/test_cache.py`,
+  `tests/test_testing.py`, `tests/test_playground.py`, and
+  `tests/test_audit_installed_packages.py`: deterministic unit tests.
   Retry and HTTP tests inject sleep and randomness. Logging tests inject
   records and handlers. Configuration tests use `monkeypatch`. HTTP tests use
   fakes and do not open sockets. Cache tests inject a monotonic clock and do
@@ -303,7 +347,7 @@ register an observer, start a thread, or open a network connection.
 
 - [API reference](api-reference.md) for parameters, return values, and exceptions.
 - [Security notes](security.md) for idempotency, secrets, and dependencies.
-- [Changelog](../CHANGELOG.md) for the 0.1.0 alpha and unreleased work.
+- [Changelog](../CHANGELOG.md) for the 0.1.0 source tree. That section is not a publication. Future work goes under Unreleased.
 - [Release checklist](releasing.md) for a later tag and PyPI upload. Publication
   still requires explicit owner approval. CI does not publish.
 - [ADR 0002](decisions/0002-structured-logging.md) for the logging decision.

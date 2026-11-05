@@ -1,14 +1,16 @@
 # API reference
 
-This page describes the public objects implemented in version 0.1.0. Import them
-from the package root:
+This page describes the public objects implemented in version 0.1.0. The
+complete package-root list is `pyforge.__all__`, recorded in
+[Architecture](architecture.md). This import is an illustrative subset:
 
 ```python
 from pyforge import RetryPolicy, retry
 ```
 
 `pyforge.__version__` is the string `"0.1.0"`. Private helpers in `pyforge.retry`
-are not part of the public API.
+are not part of the public API. `pyforge.testing` is a separate export list
+and is not imported by `import pyforge`.
 
 ## RetryPolicy
 

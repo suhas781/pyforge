@@ -6,7 +6,7 @@ PyForge is a small, typed Python package for reusable engineering primitives. Th
 
 Supported Python: 3.11 and newer. The CI workflow is configured for 3.11, 3.12, and 3.13. There are no runtime dependencies.
 
-> Status: Pre-release hardening is in the working tree for version `0.1.0`. The package is not tagged and is not on PyPI. Local checks for these edits ran on Python 3.11. Hosted CI has not run on them. This is an alpha library, not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, cachetools, pytest, or an HTTP client.
+> Status: Version `0.1.0` is an alpha in the source tree. The package is not tagged and is not on PyPI. Hosted CI for `main` commit `4cfed098962b6fc4cb10e8d2f3b18cf76483642b` succeeded on Python 3.11, 3.12, and 3.13. A later commit needs its own CI result. A clean OSV response does not mean the audited packages have no vulnerabilities. This is an alpha library, not a production certification and not a replacement for Tenacity, structlog, pydantic-settings, cachetools, pytest, or an HTTP client.
 
 ## Why PyForge exists
 
@@ -45,6 +45,7 @@ cd pyforge
 python -m venv .venv
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 # macOS/Linux: source .venv/bin/activate
+python -m pip install --upgrade pip "setuptools>=77" wheel
 python -m pip install -e ".[dev]"
 ```
 
@@ -176,13 +177,25 @@ python -m build
 python scripts/check_distribution.py
 ```
 
-The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the `build` frontend. Coverage is configured to fail under 90% for the `pyforge` package. `build` produces installable artifacts; the library does not import it.
+Run that sequence after the installation commands above. [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/releasing.md](docs/releasing.md) use the same commands. The audit script needs network access. A result with no advisories is not a claim that those packages have no vulnerabilities.
+
+The `dev` extra declares pytest, pytest-asyncio, pytest-cov, Ruff, mypy, and the `build` frontend. Coverage is configured to fail under 90% for the `pyforge` package. `build` produces installable artifacts; the library does not import it. `mypy src` checks the installable package. CI runs these checks on Python 3.11, 3.12, and 3.13.
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Pull requests should include tests for new behavior, keep the public API typed, and avoid runtime dependencies. Do not commit `dist/`, virtual environments, or `.env` files.
 
-A release is a separate decision. The steps are in [docs/releasing.md](docs/releasing.md). Merging to `main` runs tests and packaging checks. It does not publish the package.
+A release is a separate decision. The steps are in [docs/releasing.md](docs/releasing.md). Merging to `main` runs tests and packaging checks. It does not publish the package. A tag, GitHub release, or PyPI upload requires explicit owner approval.
+
+## Local playground
+
+`playground/` is a repository development tool. It is not part of the installed wheel. From a checkout, after the installation commands above:
+
+```bash
+python -m playground.server
+```
+
+The server binds to `127.0.0.1:8765` and runs only the fixed `DEMOS` actions. It does not accept arbitrary Python, has no authentication, and is for local development only. It is not a public deployment. Details are in [playground/README.md](playground/README.md) and [Security notes](docs/security.md).
 
 ## Design principles
 
@@ -206,12 +219,19 @@ pyforge/
 │   ├── py.typed
 │   ├── retry.py
 │   └── testing.py
+├── playground/
+│   ├── README.md
+│   ├── __init__.py
+│   ├── server.py
+│   └── static/
+├── tests/test_audit_installed_packages.py
 ├── tests/test_cache.py
-├── tests/test_retry.py
-├── tests/test_logging.py
 ├── tests/test_config.py
 ├── tests/test_http.py
+├── tests/test_logging.py
 ├── tests/test_observe.py
+├── tests/test_playground.py
+├── tests/test_retry.py
 ├── tests/test_testing.py
 ├── docs/
 │   ├── architecture.md
@@ -252,7 +272,7 @@ pyforge/
 - [x] Test helpers for a fake clock, recorded sleep, scripted calls, and temporary environment values
 - [x] Release checklist and packaging metadata review, without a tag or PyPI upload
 - [x] Pre-release hardening: changelog reconciliation, SHA-pinned Actions, and an OSV audit that does not publish
-- [ ] Milestone 6: tagged release after owner approval
+- [ ] Release gate: tag, GitHub release, and PyPI publication only after explicit owner approval
 
 ## Limitations
 
@@ -266,7 +286,7 @@ pyforge/
 - `MemoryCache` bounds the number of entries, not their size. It does not persist, encrypt, or share entries across processes. A restart drops the cache. Key hashing and equality run while the instance lock is held.
 - `pyforge.testing` is for tests. `temporary_env` changes the process environment for the names it is given, and those names are visible to every thread until the block exits. The helpers do not patch `time.sleep` or `asyncio.sleep`.
 - No benchmark numbers are published.
-- Python 3.12 and 3.13 were not run locally for these hardening edits. Hosted CI has not run on them. An OSV response with no advisories is not proof that no vulnerabilities exist. CI does not publish the package.
+- Hosted CI for `main` commit `4cfed098962b6fc4cb10e8d2f3b18cf76483642b` succeeded on Python 3.11, 3.12, and 3.13. That result belongs to that commit. A clean OSV response is not proof that no vulnerabilities exist. CI does not publish the package.
 
 ## License
 
