@@ -9,9 +9,10 @@ The library is an alpha at version `0.1.0`. Retry, logging, configuration,
 HTTP decisions, retry events, a process-local cache, and test helpers are on
 `main`. None of that has been tagged or uploaded to PyPI.
 
-A release workflow that runs on push could publish an unreviewed commit. The
-changelog still lists most of the library under `Unreleased`, so a tag of the
-current `0.1.0` section would describe an older subset of the code.
+A release workflow that runs on push could publish an unreviewed commit. When
+this decision was accepted, the changelog listed most of the library under
+`Unreleased`, so a tag of the then-current `0.1.0` section would have
+described an older subset of the code.
 
 ## Decision
 
@@ -33,13 +34,20 @@ The public Python API is unchanged.
 
 ## Alternatives
 
-- Tag `0.1.0` now: rejected. The owner has not approved a release, and the
-  changelog's `0.1.0` section does not include the later capabilities.
+- Tag `0.1.0` now: rejected. The owner has not approved a release. Describing
+  the source tree in the changelog is not publication.
 - Publish from the existing CI job: rejected. A push to `main` would become
   an upload, and the job would need credentials it does not have.
 - Add a `workflow_dispatch` uploader in this change: rejected. An uploader
   with a token or trusted-publisher permission is a release action. The
   checklist comes first, while the owner still has to approve the version.
+
+## Later
+
+A documentation edit after this decision described the implemented
+capabilities in the changelog's `0.1.0` section. That section still states
+that no tag and no PyPI upload exist. Owner approval is still required before
+either one.
 
 ## Consequences
 
