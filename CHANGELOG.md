@@ -53,6 +53,9 @@ Repository tools. These are not part of the installed `pyforge` wheel:
   third-party packages, and CI runs that script. `pyforge-toolkit` is skipped
   because it is not on PyPI. A response with no advisories is not a claim that
   no vulnerabilities exist.
+- `scripts/check_distribution.py` checks the built wheel and sdist. The wheel's
+  `pyforge` Python modules must match an explicit allow-list. Unexpected
+  Python modules are rejected. Dist-info metadata is not treated as a module.
 - `actions/checkout` and `actions/setup-python` are pinned to commit SHAs.
   The workflow permission remains `contents: read`.
 - `playground/` is a local development server for fixed demonstrations. It

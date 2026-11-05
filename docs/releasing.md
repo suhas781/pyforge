@@ -53,7 +53,7 @@ python -m pip install --upgrade pip "setuptools>=77" wheel
 python -m pip install -e ".[dev]"
 ruff check .
 ruff format --check .
-mypy src
+mypy src playground scripts
 pytest --cov=pyforge --cov-report=term-missing
 python scripts/audit_installed_packages.py
 python -m build

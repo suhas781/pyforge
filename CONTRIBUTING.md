@@ -18,7 +18,7 @@ dependency. `setuptools>=77` matches the build-system requirement used by
 ```bash
 ruff check .
 ruff format --check .
-mypy src
+mypy src playground scripts
 pytest --cov=pyforge --cov-report=term-missing
 python scripts/audit_installed_packages.py
 python -m build
