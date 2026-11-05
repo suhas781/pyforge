@@ -77,6 +77,7 @@ def _check_wheel(path: Path) -> None:
         missing = [item for item in WHEEL_FILES if item not in names]
         if missing:
             raise SystemExit(f"{path.name} is missing {missing}")
+        _reject_unexpected_python_modules(path.name, names)
         _reject_sensitive_paths(path.name, names)
         if any(name.startswith("tests/") or "/tests/" in name for name in names):
             raise SystemExit(f"{path.name} contains tests")
@@ -133,6 +134,38 @@ def _check_metadata(metadata: str) -> None:
     missing = [item for item in EXPECTED_CLASSIFIERS if item not in classifiers]
     if missing:
         raise SystemExit(f"Metadata is missing classifiers: {missing}")
+
+
+def package_python_modules(names: list[str]) -> set[str]:
+    """Return ``pyforge`` Python modules, ignoring wheel metadata.
+
+    A module path starts with ``pyforge/`` and ends with ``.py``. A leading
+    ``./`` is removed; a ``../`` prefix is left in place so it cannot satisfy
+    an allow-list entry. Files under ``*.dist-info/`` are metadata even when
+    their names end in ``.py``. ``py.typed`` and other non-Python package
+    files are not modules.
+    """
+    modules: set[str] = set()
+    for name in names:
+        normalized = name.replace("\\", "/")
+        while normalized.startswith("./"):
+            normalized = normalized[2:]
+        if ".dist-info/" in normalized or normalized.endswith(".dist-info"):
+            continue
+        if normalized.startswith("pyforge/") and normalized.endswith(".py"):
+            modules.add(normalized)
+    return modules
+
+
+def _reject_unexpected_python_modules(label: str, names: list[str]) -> None:
+    expected = {item for item in WHEEL_FILES if item.endswith(".py")}
+    found = package_python_modules(names)
+    missing = sorted(expected - found)
+    extra = sorted(found - expected)
+    if missing or extra:
+        raise SystemExit(
+            f"{label} Python modules do not match the allow-list: missing={missing} extra={extra}"
+        )
 
 
 def _check_wheel_tags(wheel_text: str) -> None:
